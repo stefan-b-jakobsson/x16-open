@@ -67,7 +67,9 @@ str:
 .proc read
     ldx #$42
     ldy #$07
+
     ;jsr i2c_read_byte
+
     clc
     rts
 .endproc
