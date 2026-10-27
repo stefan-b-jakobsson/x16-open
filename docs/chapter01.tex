@@ -1,0 +1,19 @@
+\begin{chapterpage}{Overview}
+%\begin{chapteritems}
+%\end{chapteritems}
+\end{chapterpage}
+
+
+X16 Open is an alternative open source operating system for the Commander X16.
+
+It is built around these ideas:
+
+\begin{itemize}
+    \item \textbf{65C02 only: } The system can be simplified by supporting only one CPU, the 65C02.
+    \item \textbf{Single user, single process: } The 65C02 CPU was designed with single user, single process systems in mind.
+    \item \textbf{Everything is a file: } Devices are accessed through file handles, using common functions such as open, read, write and close.
+    \item \textbf{The kernel is thin: } The kernel offloads as much as possible of the work to device drivers. 
+    Drivers are modular and can be loaded at runtime, while some drivers are embedded into the kernel.
+\end{itemize}
+
+

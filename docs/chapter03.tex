@@ -1,0 +1,333 @@
+\begin{chapterpage}{Device Drivers}
+    \begin{chapteritems}
+        \item Introduction
+        \item Driver API
+    \end{chapteritems}
+\end{chapterpage}
+
+\section{Introduction}
+
+X16 Open is based on loadable device drivers that do most of the work in
+the system.
+
+Device drivers needed to get the system up and running are embedded into
+the kernel ROM bank, and are automatically registered and initialized when
+the system is reset.
+
+All drivers can be replaced at runtime, making it possible to
+customize the system.
+
+
+\section{Device Driver Dispatch Function}
+
+All device drivers are required to implement a dispatch function that is placed at the
+start of the driver's place in memory.
+
+The dispatch function takes a "sub-function" number in the X registers. Most sub-functions
+need more arguments that are passed in the A, Y, and arg1-10 registers as 
+described below.
+
+The following sub-functions must be supported:
+
+\begin{longtblr}{colspec = {X[1,l] X[2,l] X[4,l]},
+width = \linewidth,
+rowhead = 1,
+rowfoot = 0}
+\# & Name    & Description \\
+\hline
+0   & on\_register      & Called when the device driver is registered \\
+1   & on\_unregister    & Called when the device driver is unregistered \\
+2   & open              & Opens a file \\
+3   & read\_byte        & Reads one byte from a file \\
+4   & read\_block       & Reads one block of bytes from a file \\
+5   & write\_byte       & Writes one byte to a file \\
+6   & write\_block      & Writes a block of bytes to a file \\
+7   & seek              & Moves the file pointer \\
+8   & position          & Returns the file pointer \\
+9   & close             & Closes a file \\
+10  & ioctl             & Driver control command \\
+11  & on\_irq           & Called on every IRQ \\
+\end{longtblr}
+
+
+\section{Function: on\_register}
+
+\textbf{Driver function \#:} 0 \\
+\textbf{Input:} None \\
+\textbf{Output:} A = Flags \\
+\textbf{Errors:} EIO
+
+This function is called by the kernel when registering a device driver. It can,
+for instance, be used to initialize the driver.
+
+The device driver flags (bits 0-5) are returned in the A register. The possible flags are:
+
+\begin{itemize}
+    \item Bit 0: Set if reading is supported.
+    \item Bit 1: Set if writing is supported.
+    \item Bit 2: Set if appending is supported.
+    \item Bit 3: Set if seeking is supported.
+    \item Bit 4: Set if a block device, unset if a char device.
+    \item Bits 5-6: Reserved, set by the kernel, not the driver.
+    \item Bit 7: Set if kernel must call the driver's on\_irq function on every IRQ.
+\end{itemize}
+
+EIO is a driver-specific error.
+
+
+\section{Driver Function: on\_unregister}
+
+\textbf{Driver function \#:} 1 \\
+\textbf{Input:} None \\
+\textbf{Output:} None  \\
+\textbf{Errors:} EIO
+
+This function is called by the kernel when unregistering a device driver. It can,
+for instance, be used to clean up and free driver resources.
+
+EIO is a driver-specific error.
+
+
+\section{Function: open}
+
+\textbf{Function \#:} 2 \\
+\textbf{Input:} A = Flags, arg1-2 = Path address, arg3 = Path bank \\
+\textbf{Output:} Y = Context ID, A = Flags \\
+\textbf{Errors:} ENOTFOUND, ENOTFILE, EINVAL, EIO
+
+Opens a file or directory at the specified path.
+
+You must select exactly one of the following flags with
+the A register:
+
+\begin{itemize}
+    \item Bit 0: Set if open for reading
+    \item Bit 1: Set if open for writing
+    \item Bit 2: Set if open for appending
+\end{itemize}
+
+The driver's internal context ID is returned in the Y register if the call is successful. 
+
+The A register holds the following flags:
+
+\begin{itemize}
+    \item Bits 0-2: Input preserved.
+    \item Bit 3: Set if a file, unset if a directory.
+    \item Bit 7: Set if opened successfully.
+\end{itemize}
+
+ENOTFOUND is returned if the file is not found.
+
+ENOTFILE is returned if attempting to write or append
+to a directory.
+
+EINVAL is returned if the operation requested by the input flags is 
+not supported by the device, or if not exactly one of the flags was set.
+
+EIO is a driver-specific error.
+
+
+\section{Function: read\_byte}
+
+\textbf{Function \#:} 3 \\
+\textbf{Input:} Y = Context ID \\
+\textbf{Output:} A = Byte value \\
+\textbf{Errors:} ENOTOPEN, EEOF, EIO
+
+Reads one byte from a file.
+
+The context ID is used internally by the device driver to keep
+track of multiple open files.
+
+ENOTOPEN is returned if the context ID is not active.
+
+EEOF is returned if no value can be returned, as the file
+pointer is at the end of the file. EEOF is not returned when
+successfully reading the final byte; it is returned on
+the following read attempt.
+
+EIO is a driver-specific error.
+
+
+\section{Function: read\_block}
+
+\textbf{Function \#:} 4 \\
+\textbf{Input:} Y = Context ID, arg1-2 = Requested number of bytes, arg3-4 = Buffer address, arg5 = Buffer bank \\
+\textbf{Output:} arg6-7 = Number of bytes read \\
+\textbf{Errors:} ENOTOPEN, EEOF, EIO
+
+Reads one block of bytes from a file. The requested size of the block is set in arg1-2.
+The block is stored at the memory address and bank set in arg 3-5.
+
+The size of a block is driver-specific. It is not guaranteed that you receive the requested 
+number of bytes. The number of bytes actually read is returned in arg6-7.
+
+The context ID is used internally by the device driver to keep
+track of multiple open files.
+
+ENOTOPEN is returned if the context ID is not active.
+
+EEOF is returned if no value can be returned, as the file
+pointer is at the end of the file. EEOF is not returned when
+successfully reading the final byte; it is returned on
+the following read attempt.
+
+EIO is a driver-specific error.
+
+
+\section{Function: write\_byte}
+
+\textbf{Function \#:} 5 \\
+\textbf{Input:} Y = Context ID, A = Byte value \\
+\textbf{Output:} None \\
+\textbf{Errors:} ENOTOPEN, ENOTFILE, EIO
+
+Writes one byte to a file.
+
+The context ID is used internally by the device driver to keep
+track of multiple open files.
+
+ENOTOPEN is returned if the context ID is not active.
+
+ENOTFILE is returned if attempting to write or append
+to a directory.
+
+EIO is a driver-specific error.
+
+
+\section{Function: write\_block}
+
+\textbf{Function \#:} 6 \\
+\textbf{Input:} Y = Context ID, arg1-2 = Buffer size, arg3-4 = Buffer address, arg5 = Buffer bank \\
+\textbf{Output:} arg6-7 = Number of bytes written \\
+\textbf{Errors:} ENOTOPEN, ENOTFILE, EIO
+
+Writes one block of bytes to a file.
+
+The size of a block is driver-specific. It is not guaranteed that all requested
+bytes are written to the file. The number of bytes actually written is returned in arg6-7.
+
+The context ID is used internally by the device driver to keep
+track of multiple open files.
+
+ENOTOPEN is returned if the context ID is not active.
+
+ENOTFILE is returned if attempting to write or append
+to a directory.
+
+EIO is a driver-specific error.
+
+
+\section{Function: seek}
+
+\textbf{Function \#:} 7 \\
+\textbf{Input:} Y = Context ID, arg1-4 = New position \\
+\textbf{Output:} arg1-4 = Current position \\
+\textbf{Errors:} EINVAL, ENOTOPEN, EIO
+
+Moves the file pointer to the requested position.
+
+The file position after this call is returned in arg1-4.
+
+Seeking is only supported on files opened for reading. Attempting to 
+seek on a file opened for writing or appending returns 
+the EINVAL error.
+
+EINVAL is also returned if the device driver doesn't support
+seeking.
+
+The ENOTOPEN error is returned if the specified file context ID is
+not active.
+
+EIO is a driver-specific error.
+
+
+\section{Function: position}
+
+\textbf{Function \#:} 8 \\
+\textbf{Input:} Y = Context ID \\
+\textbf{Output:} arg1-4 = File position \\
+\textbf{Errors:} EINVAL, ENOTOPEN, EINVAL, EIO
+
+Returns the current position in the specified file in arg1-4.
+
+ENOTOPEN is returned if the context ID is not active.
+
+EINVAL can be returned if the driver doesn't support
+reading the file positions.
+
+EIO is a driver-specific error.
+
+
+\section{Function: close}
+
+\textbf{Function \#:} 9 \\
+\textbf{Input:} Y = Context ID \\
+\textbf{Output:} None \\
+\textbf{Errors:} ENOTOPEN, EIO
+
+This function closes a file.
+
+ENOTOPEN is returned if the context ID is not active.
+
+EIO is a driver-specific error.
+
+
+\section{Function: ioctl}
+
+\textbf{Function \#:} 10 \\
+\textbf{Input:} Y = Context ID, A = Device type, arg1 = Command, arg2 = Input length, arg3-4 = Input data or input buffer address, arg5 = Input buffer bank,
+arg6 = Output max length, arg7-8 = Output buffer address, arg9 = Output buffer bank \\
+\textbf{Output:} A = Output length, arg7-8 = Output data or output buffer address, arg9 = Output buffer bank \\
+\textbf{Errors:} EIO
+
+This function executes a driver-specific control command.
+
+The file context ID is passed in the Y register. The driver may ignore the context ID if it is not relevant
+to the control command.
+
+The device type is passed in the A register. A driver for a specific device type is expected to
+handle certain control commands.
+
+The control command is specified in arg1. The two most significant bits are used to flag if the input 
+(arg3-4) and output (arg7-8) are direct values or buffer pointers. Direct values can be at most two bytes long.
+
+\begin{itemize}
+    \item Bit 7: Set if output is a direct value, clear if output is a buffer pointer.
+    \item Bit 6: Set if input is a direct value, clear if input is a buffer pointer.
+\end{itemize}
+
+The input is specified in arg2-5:
+
+\begin{itemize}
+    \item arg2: Input length.
+    \item arg3-4: A direct value (arg1 bit 6 set) set by the driver or input buffer address set by the caller (arg bit 6 clear).
+    \item arg5: Input buffer bank set by the caller (arg1 bit 6 clear)
+\end{itemize}
+
+The output is specified in arg6-9 and the A register:
+
+\begin{itemize}
+    \item arg6: Output max length set by the caller.
+    \item arg7-8: A direct value (arg 1 bit 7 set) set by the driver or output buffer address set by the caller (arg1 bit 7 clear).
+    \item arg9: Output buffer bank set by the caller (arg1 bit 7 clear).
+    \item A: Output length set by the driver.
+\end{itemize}
+
+EIO is a driver-specific error.
+
+
+\section{Function: on\_irq}
+
+\textbf{Function \#:} 11 \\
+\textbf{Input:} None \\
+\textbf{Output:} None \\
+\textbf{Errors:} EIO
+
+This function is only intended to be called by the kernel's
+IRQ handler.
+
+It can be used by device drivers that need to be updated
+once every interrupt, for instance terminals.
+
+EIO is a driver-specific error.

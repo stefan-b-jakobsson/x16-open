@@ -1,0 +1,603 @@
+\begin{chapterpage}{The Kernel}
+    \begin{chapteritems}
+        \item Kernel API
+        \item Device Table
+        \item File Table 
+    \end{chapteritems}
+\end{chapterpage}
+
+\section{Introduction}
+
+Most of the work in the system is done by device drivers. The kernel is
+just a thin layer that provides a common interface to the drivers.
+
+The core device drivers required to start the system are embedded into the kernel ROM bank (bank 0).
+Other device drivers, including alternatives to the core drivers, can be stored
+in ROM banks 1-255 or even be loaded into RAM at runtime.
+
+You are free to decide what device drivers are used for different tasks. If you, for example, want 
+a USB keyboard instead of the default PS/2 keyboard, it is possible to load and use a custom USB 
+keyboard device driver instead of the default PS/2 keyboard driver.
+
+The kernel is inspired by Unix, where almost everything is a file. The device driver interface is, 
+consequently, based on functions such as open, read, write, and close.
+
+
+\section{API Functions}
+
+The kernel's internal code and data structures are subject to change. 
+Only the functions listed in this section are part of the stable interface.
+
+\begin{longtblr}{colspec = {X[5,l] X[3,l] X[8,l] },
+width = \linewidth,
+rowhead = 1,
+rowfoot = 0}
+Name & Address & Description \\
+\hline
+reset               & \$c000    & System reset \\
+alloc               & \$c003    & Allocates one RAM bank (8 kB) \\
+free                & \$c006    & Frees one RAM bank \\          
+device\_register    & \$c009    & Registers a new device driver \\
+device\_unregister  & \$c00c    & Unregisters a device \\          
+file\_open          & \$c00f    & Opens a file \\                   
+file\_read\_byte    & \$c012    & Reads one byte from a file \\
+file\_read\_block   & \$c015    & Reads a block of bytes from a file \\
+file\_write\_byte   & \$c018    & Writes one byte to a file \\
+file\_write\_block  & \$c01b    & Writes a block of bytes to a file \\
+file\_seek          & \$c01e    & Seeks a position in a file \\
+file\_position      & \$c021    & Returns current position in a file \\
+file\_close         & \$c024    & Closes a file \\
+file\_ioctl         & \$c027    & Driver-specific control commands \\
+stdin\_read         & \$c02a    & Reads one byte from stdin \\     
+stdout\_write       & \$c02d    & Writes one byte to stdout \\              
+get\_ticks          & \$c030    & Returns the jiffy clock \\              
+set\_ticks          & \$c033    & Sets the jiffy clock \\                
+get\_errmsg         & \$c036    & Returns system error message \\
+set\_errmsg         & \$c039    & Sets system error message \\
+get\_info           & \$c03c    & Get system info \\
+\end{longtblr}
+
+
+\section{Passing and Returning Values}
+
+Values are passed to the kernel functions and returned through 
+the A, X, Y registers, and ten zero page registers 
+named arg1-arg10 (address \$02-\$0b).
+
+Multi-byte values are passed or returned least significant byte
+first (little-endian).
+
+arg1-arg10 are reserved for kernel calls and must not be used for
+other purposes.
+
+
+\section{Error Handling}
+
+All kernel functions must indicate an error
+condition by setting the carry flag on return.
+
+An error code is always returned in the A register. The A register
+can return other values if no error occurred. A plain text error
+message is available through the get\_errmsg
+function.
+
+List of error codes:
+
+\begin{longtblr}{colspec = {X[1,l] X[3,l] X[5,l] },
+width = \linewidth,
+rowhead = 1,
+rowfoot = 0}
+Code & Name & Description \\
+\hline
+0     & EOK                 & No error                                \\
+1     & ENOMEM              & Out of memory                           \\
+2     & EMEMINUSE           & Requested memory already in use         \\
+3     & ENODEVSPC           & Too many devices                        \\
+4     & ENODEV              & Device does not exist                   \\
+5     & EDEVBUSY            & Device is in use                        \\
+6     & ENOFILESPC          & Too many files                          \\
+7     & ENOTFOUND           & File not found                          \\
+8     & ENOTFILE            & Path is not a file                      \\
+9     & ENOTDIR             & Path is not a directory                 \\
+10    & ENOTOPEN            & File not open                           \\
+11    & EFILEOPEN           & File is open                            \\
+12    & EINVAL              & Invalid argument or operation           \\
+13    & EIO                 & Generic driver failure                  \\
+14    & EEOF                & End of file                             \\
+255   & ECUSTOM             & Custom error message                    \\
+\end{longtblr}
+
+
+\section{Device Table}
+
+The kernel uses a device table to keep track of device drivers. The device table has room for 16 devices, 
+and contains the following fields:
+
+\begin{longtblr}{colspec = {X[3,l] X[2,l] X[11,l] },
+width = \linewidth,
+rowhead = 1,
+rowfoot = 0}
+Field & Values & Description \\
+\hline
+addr\_lo    & 0-255 & Pointer to device driver code, bits 0-7 \\
+addr\_hi    & 0-255 & Pointer to device driver code, bits 8-15 \\
+bank        & 0-255 & The RAM or ROM bank where the driver is stored \\
+flags       & 0-255 & See list of flags below \\
+\end{longtblr}
+
+The flags stored in the device table are:
+
+\begin{itemize}
+    \item Bit 0: Set if reading is supported.
+    \item Bit 1: Set if writing is supported.
+    \item Bit 2: Set if appending is supported.
+    \item Bit 3: Set if seeking is supported.
+    \item Bit 4: Set if a block device, unset if a char device.
+    \item Bits 5-6: Driver location, where 00 = Not present, 01 = ROM bank 0 or low RAM,
+    10 = ROM bank 1-255, 11 = RAM bank 0-255.
+    \item Bit 7: Set if kernel is requested to call the driver's on\_irq function on every IRQ.
+\end{itemize}
+
+A device driver is added to the device table when you call the device\_register function. The
+device driver is removed when you call device\_unregister. It is not recommended or
+safe to manipulate the device table directly.
+
+
+\section{File Table}
+
+The kernel has a file table to keep track of all opened files. There is room for 16 files in
+the file table. The table holds the following information:
+
+\begin{longtblr}{colspec = {X[3,l] X[2,l] X[10,l] },
+width = \linewidth,
+rowhead = 1,
+rowfoot = 0}
+Field & Values & Description \\
+\hline
+driver\_id  & 0-15 & Driver's index in device table \\
+context\_id & 0-255 & The context ID is used internally by drivers to keep track of multiple open files \\
+flags       & 0-255 & See list of flags below \\
+\end{longtblr}
+
+The flags in the file table are:
+
+\begin{itemize}
+    \item Bit 0: Set if opened for reading.
+    \item Bit 1: Set if opened for writing.
+    \item Bit 2: Set if opened for appending.
+    \item Bit 3: Set if a file, unset if a directory.
+    \item Bits 4-6: Reserved.
+    \item Bit 7: Set if file is open.
+\end{itemize}
+
+A file is added to the file table when you call the file\_open function, and it is removed when
+you call the file\_close function. It is not recommended or safe to manipulate the file table directly.
+
+Some file handles have a fixed meaning to the system:
+
+\begin{itemize}
+    \item 0: STDIN.
+    \item 1: STDOUT.
+    \item 2: Keyboard.
+    \item 3: Mouse.
+    \item 4: SNES game controllers.
+\end{itemize}
+
+
+\section{API Function Specifications}
+
+\subsection{Function: reset}
+
+\textbf{Call address:} \$c000 \\
+\textbf{Input:} None \\
+\textbf{Output:} None \\
+\textbf{Errors:} None
+
+This function does a cold reset of the system. It is called automatically when
+the system is reset. It is also possible to call the function while
+running the system.
+
+The function closes any open files, unregisters any current device drivers, and
+frees all allocated RAM banks.
+
+Finally, it registers all built-in base drivers that are needed to use
+the system:
+
+\begin{enumerate}\addtocounter{enumi}{-1}
+    \item X16 terminal driver.
+    \item Generic I2C driver.
+    \item PS/2 keyboard driver.
+    \item PS/2 mouse driver.
+    \item SNES game controller driver.
+    \item SD card driver.
+\end{enumerate}
+
+
+\subsection{Function: alloc}
+
+\textbf{Call address:} \$c003 \\
+\textbf{Input:} A = RAM bank \\
+\textbf{Output:} A = RAM bank \\
+\textbf{Errors:} ENOMEM, EMEMINUSE
+
+The X16 has no hardware memory management. The kernel's memory management functions 
+(alloc and free) keep track of which part of banked RAM is free to use. All well-behaved
+applications should use these functions. They may otherwise overwrite custom
+device drivers loaded into banked RAM.
+
+RAM bank 0 is used by the kernel and can't be allocated for other purposes.
+
+If this function is called with A = 0, it will search for and allocate the next available
+RAM bank. Error ENOMEM is set if there is no free memory.
+
+If the function is called with A > 0, it will attempt to allocate the specified RAM bank.
+EMEMINUSE is returned if that bank is already allocated.
+
+A successfully allocated RAM bank is returned in the A register.
+
+
+\subsection{Function: free}
+
+\textbf{Call address:} \$c006 \\
+\textbf{Input:} A = RAM bank \\
+\textbf{Output:} None \\
+\textbf{Errors:} EINVAL
+
+This function frees a RAM bank that was allocated with the alloc function.
+
+RAM bank 0 is used by the system and may not be freed. If this function is
+called with A = 0, the EINVAL error is returned.
+
+
+\subsection{Function: device\_register}
+
+\textbf{Call address:} \$c009 \\
+\textbf{Input:} Y = Device ID, arg1-2 = Driver address, arg3 = Driver bank \\
+\textbf{Output:} A = Device ID \\
+\textbf{Errors:} ENODEVSPC, EDEVBUSY, EIO
+
+The function registers a device driver that is already present in memory.
+
+The system's base drivers needed to boot the system are embedded into
+the kernel ROM bank, and are automatically registered and initialized by
+the reset function.
+
+If called with Y = 255, the first free device ID will be used. Otherwise, the function 
+attempts to use the specified device ID.
+
+The driver's on\_register function is automatically called when calling this function. 
+The kernel's device table is updated with information on the new driver, 
+including flags returned by the on\_register function.
+
+The ENODEVSPC error is returned if the driver table is full.
+
+The EDEVBUSY error is returned if the specified device ID is already in use.
+In that case you must first call device\_unregister to free the current driver.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: device\_unregister}
+
+\textbf{Call address:} \$c00c \\
+\textbf{Input:} Y = Device ID \\
+\textbf{Output:} None \\
+\textbf{Errors:} EDEVBUSY, EIO
+
+Unregisters the specified device driver.
+
+The EDEVBUSY error is returned if the device driver is linked to an open file.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_open}
+
+\textbf{Call address:} \$c00f\\
+\textbf{Input:} X = File handle, Y = Device ID, A = Flags, arg1-2 = Path address, arg3 = Path bank \\
+\textbf{Output:} X = File handle, Y = Context ID \\
+\textbf{Errors:} ENODEV, ENOFILESPC, EFILEOPEN, ENOTFILE, ENOTFOUND, EINVAL, EIO
+
+Opens a file using the specified device driver.
+
+If the X register is set to \$ff, the new file is linked to the next available file handle. 
+Otherwise, the function attempts to use the specified file handle.
+
+The file is opened using the device driver specified in the Y register.
+
+The following flags are supported:
+
+\begin{itemize}   
+    \item Bit 0: Set if opened for reading.
+    \item Bit 1: Set if opened for writing.
+    \item Bit 2: Set if opened for appending.
+\end{itemize}
+
+You must set exactly one flag. The kernel doesn't support opening a file
+in multiple modes (or no mode).
+
+The path must be a null-terminated string.
+
+If successfully opened, the file is entered into the file table. The file
+handle is returned in the X register and the driver's file context ID is
+returned in the Y register. The context is managed by the driver, and is used 
+by the driver to keep track of multiple files that are opened at the same time.
+
+ENODEV is returned if no driver is linked to the specified device ID.
+
+The ENOFILESPC error is set if the file table is full. There can be at most 16 open files
+at any given time. The same error is also returned if the number of files the driver
+can handle is exceeded.
+
+The EFILEOPEN error is returned if you try to link a new file to a file handle that is already in use.
+
+ENOTFILE is returned if attempting to write or append to a directory.
+
+The function fails with ENOTFOUND if the file is not found.
+
+The EINVAL error is returned if the device driver doesn't have the capability
+requested in the flags argument. The same error is returned if not exactly one flag is set.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_read\_byte}
+
+\textbf{Call address:} \$c012\\
+\textbf{Input:} X = File handle \\
+\textbf{Output:} A = Value \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
+
+Reads one byte from the specified file.
+
+The ENOTOPEN error is returned if the specified file handle is not open.
+
+The EINVAL error is set if the file is not opened for reading.
+
+EEOF is returned if the read operation was attempted at end of the file and 
+no byte value was returned. A successful read operation of the final byte does 
+not return EEOF; the caller receives EEOF on the following read attempt.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_read\_block}
+
+\textbf{Call address:} \$c015\\
+\textbf{Input:} X = File handle, arg1-2 = Requested number of bytes, arg3-4 = Buffer address, arg5 = Buffer bank \\
+\textbf{Output:} arg6-7 = Number of bytes read \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
+
+Reads a block from the specified file, at most the requested number of bytes. It is not guaranteed that
+you get the requested number of bytes.
+
+The ENOTOPEN error is returned if the specified file handle is not open.
+
+The EINVAL error is returned if the file is not opened for reading.
+
+EEOF is set if the read operation was attempted at end of the file and 
+no byte value was returned. A successful read operation of the final byte does 
+not return EEOF; the caller receives EEOF on the next read attempt.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_write\_byte}
+
+\textbf{Call address:} \$c018\\
+\textbf{Input:} X = File handle, A = Byte value \\
+\textbf{Output:} None \\
+\textbf{Errors:} ENOTOPEN, ENOTFILE, EINVAL, EIO
+
+Writes one byte to the specified file.
+
+The ENOTOPEN error is returned if the specified file handle is not open.
+
+ENOTFILE is returned if attempting to write or append
+to a directory.
+
+The EINVAL error is returned if the file is not opened for writing or appending.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_write\_block}
+
+\textbf{Call address:} \$c01b\\
+\textbf{Input:} X = File handle, arg1-2 = Buffer size, arg3-4 = Buffer address, arg5 = Buffer bank \\
+\textbf{Output:} arg6-7 = Number of bytes written \\
+\textbf{Errors:} ENOTOPEN, ENOTFILE, EINVAL, EIO
+
+Writes one block to the specified file, at most the entire buffer size passed in arg1-2.
+
+The ENOTOPEN error is returned if the specified file handle is not open.
+
+ENOTFILE is returned if attempting to write or append
+to a directory.
+
+The EINVAL error is returned if the file is not opened for writing or appending.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_seek}
+
+\textbf{Call address:} \$c01e\\
+\textbf{Input:} X = File handle, arg1-4 = File position \\
+\textbf{Output:} arg1-4 = File position \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EIO
+
+Moves the file pointer to the requested position.
+
+The file position after this call is returned in arg1-4.
+
+The kernel only allows writing to files in a sequential order at the end of the file, 
+and seeking is thus allowed only on files opened for reading. Attempting to 
+seek on a file opened for writing or appending returns 
+the EINVAL error.
+
+EINVAL is also returned if the device driver doesn't support
+seeking.
+
+The ENOTOPEN error is returned if the specified file handle is not open.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_position}
+
+\textbf{Call address:} \$c021\\
+\textbf{Input:} X = File handle \\
+\textbf{Output:} arg1-4 = File position \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EIO
+
+Returns the current position in the specified file in arg1-4.
+
+ENOTOPEN is returned if the file is not open.
+
+EINVAL can be returned if the driver doesn't support
+reading the file positions.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_close}
+
+\textbf{Call address:} \$c024\\
+\textbf{Input:} X = File handle \\
+\textbf{Output:} None \\
+\textbf{Errors:} ENOTOPEN, EIO
+
+Closes the specified file and removes it from the file table.
+
+ENOTOPEN is returned if the file handle is not open.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: file\_ioctl}
+
+\textbf{Call address:} \$c027\\
+\textbf{Input:} X = File handle, A = Device type, arg1 = Command, arg2 = Input length, arg3-4 = Input data or input buffer address, arg5 = Input buffer bank,
+arg6 = Output max length, arg7-8 = Output buffer address, arg9 = Output buffer bank \\
+\textbf{Output:} A = Output length, arg7-8 = Output data or output buffer address, arg9 = Output buffer bank \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EIO
+
+This function executes a device-specific control command.
+
+The file handle is given in order to let the command affect a specific file context. 
+Device drivers may, however, ignore the file context if it's not relevant to the command.
+ENOTOPEN is returned if the file is not open. 
+
+If this function is called with X = \$ff, the driver must ignore it and not
+return the ENOTOPEN error.
+
+The type of device that the command is meant for is specified in the A register. EINVAL 
+is returned if the driver doesn't support commands for the specified device type.
+
+The control command is specified in arg1. The two most significant bits are used to flag if the input 
+(arg3-4) and output (arg7-8) are direct values or buffer pointers. Direct values can be at most two bytes long.
+
+\begin{itemize}
+    \item Bit 7: Set if output is a direct value, clear if output is a buffer pointer.
+    \item Bit 6: Set if input is a direct value, clear if input is a buffer pointer.
+\end{itemize}
+
+The input is specified in arg1-5, and the output is specified in arg7-8.
+
+The function returns the output length in the A register. If the output is a direct value, it is returned
+in arg7-8. Otherwise, the output buffer pointer and bank are returned in arg7-9.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: stdin\_read}
+
+\textbf{Call address:} \$c02a\\
+\textbf{Input:} None \\
+\textbf{Output:} A = Byte value \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
+
+Reads one byte from STDIN, i.e. file handle 0.
+
+The ENOTOPEN error is returned if STDIN is not open.
+
+The EINVAL error is set if STDIN is not opened for reading.
+
+EEOF is returned if the read operation was attempted at end of the file and 
+no byte value was returned. A successful read operation of the final byte does 
+not return EEOF; the caller receives EEOF on the following read attempt. This
+doesn't normally happen when STDIN is connected to a keyboard that
+has an endless stream conceptually.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: stdout\_write}
+
+\textbf{Call address:} \$c02d\\
+\textbf{Input:} A = Byte value \\
+\textbf{Output:} None \\
+\textbf{Errors:} ENOTOPEN, EINVAL, EIO
+
+Writes one byte to STDOUT, i.e. file handle 1.
+
+The ENOTOPEN error is returned if STDOUT is not open.
+
+The EINVAL error is returned if STDOUT is not opened for writing or appending.
+
+EIO is a driver-specific error.
+
+
+\subsection{Function: get\_ticks}
+
+\textbf{Call address:} \$c030\\
+\textbf{Input:} None \\
+\textbf{Output:} X, Y, A = Counter value \\
+\textbf{Errors:} None
+
+Returns the jiffy clock tick counter that is
+incremented on every IRQ (60 times per second).
+
+
+\subsection{Function: set\_ticks}
+
+\textbf{Call address:} \$c033\\
+\textbf{Input:} X, Y, A = Counter value \\
+\textbf{Output:} None \\
+\textbf{Errors:} None
+
+Sets the jiffy clock tick counter that is
+incremented on every IRQ (60 times per second).
+
+
+\subsection{Function: get\_errmsg}
+
+\textbf{Call address:} \$c036\\
+\textbf{Input:} None \\
+\textbf{Output:} A = Error number, arg1-2 = Error message address, arg3 = Error message bank \\
+\textbf{Errors:} None
+
+Returns the last error number in the A register and a pointer to
+the last error message, that is always a null-terminated string.
+
+
+\subsection{Function: set\_errmsg}
+
+\textbf{Call address:} \$c039\\
+\textbf{Input:} A = Error number, arg1-2 = Error message address, arg3 = Error message bank \\
+\textbf{Output:} None \\
+\textbf{Errors:} None
+
+Sets the error number and message that can be retrieved with the
+get\_errmsg function.
+
+
+\subsection{Function: get\_info}
+
+\textbf{Call address:} \$c03c\\
+\textbf{Input:} None \\
+\textbf{Output:} arg1-3 = Kernel version (major, minor patch), arg4-5 = String address, arg6 = String bank \\
+\textbf{Errors:} None
+
+Returns the kernel version, and a plain null-terminated text description of the system.
