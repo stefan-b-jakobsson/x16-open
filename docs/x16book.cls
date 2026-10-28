@@ -42,8 +42,20 @@
 \setlength{\emergencystretch}{3em}
 
 % Definitions: Fonts
-\setmainfont{Futura}
-\setsansfont{Futura}
+\setmainfont{Jost}[
+    Weight = 500,
+    FontFace = {b}{n}{Font = Jost, Weight = 700},
+    FontFace = {b}{it}{Font = Jost-Italic, Weight = 700},
+    ItalicFont = Jost-Italic,
+    ItalicFeatures = {Weight = 500}
+]
+\setsansfont{Jost}[
+    Weight = 500,
+    FontFace = {b}{n}{Font = Jost, Weight = 700},
+    FontFace = {b}{it}{Font = Jost-Italic, Weight = 700},
+    ItalicFont = Jost-Italic,
+    ItalicFeatures = {Weight = 500}
+]
 \setmonofont{IBMPlexMono-Light}[
     Scale = MatchLowercase
 ]
