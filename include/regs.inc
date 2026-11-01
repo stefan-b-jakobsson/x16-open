@@ -1,23 +1,16 @@
-; Kernal function 8 bit arguments, not to be used by applications
-arg1 = $02
-arg2 = $03
-arg3 = $04
-arg4 = $05
-arg5 = $06
-arg6 = $07
-arg7 = $08
-arg8 = $09
+; 8 bit zero page registers
+r0  = $02
+r1  = $03
+r2  = $04
+r3  = $05 
+r4  = $06
+r5  = $07
+r6  = $08
+r7  = $09
+r8  = $0a
+r9  = $0b
+r10 = $0c
+r11 = $0d
+r12 = $0e
+r13 = $0f
 
-; 16 bit registers, free to be used by applications
-r0 = $0a
-r1 = $0c
-r2 = $0e
-r3 = $10
-r4 = $12
-r5 = $14
-r6 = $16
-r7 = $18
-r8 = $1a
-r9 = $1c
-r10 = $1e
-r11 = $20

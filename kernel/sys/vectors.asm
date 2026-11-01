@@ -24,6 +24,7 @@
 ; POSSIBILITY OF SUCH DAMAGE.
 ; *****************************************************************************
 
+; Imports
 .import on_nmi, on_reset, on_irq_request
 
 ; CPU hardware vectors at address $fffa-$ffff

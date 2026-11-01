@@ -1,0 +1,16 @@
+EOK             = 0
+ENOMEM          = 1
+EMEMINUSE       = 2
+ENODEVSPC       = 3
+ENODEV          = 4
+EDEVBUSY        = 5
+ENOFILESPC      = 6
+ENOTFOUND       = 7
+ENOTFILE        = 8
+ENOTDIR         = 9
+ENOTOPEN        = 10
+EFILEOPEN       = 11
+EINVAL          = 12
+EIO             = 13
+EEOF            = 14
+ECUSTOM         = 15

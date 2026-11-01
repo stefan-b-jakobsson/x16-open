@@ -24,6 +24,7 @@
 ; POSSIBILITY OF SUCH DAMAGE.
 ; *****************************************************************************
 
+; Exports
 .export on_nmi
 
 .CODE

@@ -23,7 +23,8 @@ KERNEL_SOURCES = \
 	kernel/sys/irq.asm \
 	kernel/sys/nmi.asm \
 	kernel/sys/reset.asm \
-	kernel/sys/vectors.asm
+	kernel/sys/vectors.asm \
+	kernel/sys/file.asm
 
 BANK_BINS = \
 	$(BUILD_DIR)/kernel.bin \

@@ -24,6 +24,8 @@
 ; POSSIBILITY OF SUCH DAMAGE.
 ; *****************************************************************************
 
+.include "regs.inc"
+
 .export terminal_dispatch
 
 .import petscii
@@ -37,67 +39,56 @@ VERA_SCREEN_ADDR = screen_addr
 
 ; *****************************************************************************
 ; Purpose...............: Terminal driver dispatch function
-; Input.................: X = Driver function ID
+; Input.................: Y         Driver function ID
+;                         Further input as required by the driver function
+; Output................: According to driver function documentation
+; Preparatory rutines...: None
+; Errors................: C         Set on error
+;                         A         Error code, according to driver function
+;                                   documentation
+; Preserved registers...: None
+; Credits...............: New implementation, not based on previous work
+.proc terminal_dispatch
+    ; Move Y to X
+    phy
+    plx
+
+    ; Call sub-function
+    jmp (jmp_table,x)
+    
+jmp_table:
+    .word on_register               ; ID 0, on_register
+    .word not_implemented           ; ID 2, on_unregister
+    .word not_implemented           ; ID 4, open
+    .word not_implemented           ; ID 6, dup
+    .word not_implemented           ; ID 8, read_byte
+    .word not_implemented           ; ID 10, read_block
+    .word write_byte                ; ID 12, write_byte
+    .word not_implemented           ; ID 14, write_block
+    .word not_implemented           ; ID 16, seek
+    .word not_implemented           ; ID 18, position
+    .word not_implemented           ; ID 20, close
+    .word not_implemented           ; ID 22, ioctl
+    .word on_irq                    ; ID 24, on_irq
+    .word not_implemented           ; ID 26, driver_string
+.endproc
+
+;*****************************************************************************
+; Purpose...............: Clear screen and setup terminal driver
+; Input.................: None
 ; Output................: None
 ; Preparatory rutines...: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
-.proc terminal_dispatch
-    jmp (jmp_table,x)
-    
-jmp_table:
-    .word terminal_init
-    .word not_implemented   ; name
-    .word not_implemented   ; open
-    .word not_implemented   ; read
-    .word terminal_write    ; write
-    .word not_implemented   ; close
-    .word not_implemented   ; control
-    .word not_implemented   ; info
-    .word not_implemented   ; on_irq
-.endproc
-
-.proc terminal_write
-    pha
-    lda terminal_x
-    asl
-    sta VERA_ADDR_L
-    clc
-    lda terminal_y
-    adc #$b0
-    sta VERA_ADDR_M
-    lda #1
-    sta VERA_ADDR_H
-
-    pla
-    sta VERA_DATA0
-
-    inc terminal_x
-    lda terminal_x
-    cmp #80
-    bcc :+
-    stz terminal_x
-    inc terminal_y
-
-:   rts
-.endproc
-
-.proc not_implemented
-    rts
-.endproc
-
-; *****************************************************************************
-; Purpose...............: Setup default video mode 
-; Input.................: None
-; Output................: None
-; Preparatory rutines...: None
-; Errors................: None
-; Registers affected....: .A, .X, .Y
-; Credits...............: New implementation, not based on previous work
-.proc terminal_init
+.proc on_register
+    ; Cursor position to top left
     stz terminal_x
     stz terminal_y
+
+    ; Activate cursor
+    lda #1
+    sta cursor_state
 
     ; Reset VERA + DCSEL=0 + ADDRSEL=0
     lda #$80
@@ -124,7 +115,7 @@ jmp_table:
     inc $23
     dex
     bne :-
-
+    
     ; Layer 1 config
     lda #$60                            ; Map height 64 + Map width 128
     sta VERA_L1_CONFIG
@@ -138,7 +129,167 @@ jmp_table:
     ; Set screen mode 0
     clc
     lda #$00
-    jmp terminal_mode 
+    jsr screen_mode
+
+    ; Clear screen
+    stz VERA_ADDR_L
+    lda #$b0
+    sta VERA_ADDR_M
+    lda #%00010001
+    sta VERA_ADDR_H
+    ldx #80
+    ldy #97
+:   lda #32
+    sta VERA_DATA0
+    sty VERA_DATA0
+    dex
+    bne :-
+    ldx #80
+    inc VERA_ADDR_M
+    stz VERA_ADDR_L
+    lda VERA_ADDR_M
+    cmp #$b0+60
+    bcc :-
+
+    ; Exit function
+    clc
+    rts
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Writes a byte to the screen
+; Input.................: r0        Byte value
+; Output................: None
+; Preparatory rutines...: open
+; Errors................: None
+; Preserved registers...: None
+; Credits...............: New implementation, not based on previous work
+.proc write_byte
+    ; Get byte value
+    ldx r0
+
+    ; Check if CR
+    cpx #13
+    bne :+
+    stz terminal_x
+    inc terminal_y
+    clc
+    rts
+    
+    ; Setup VERA address based on cursor position
+:   lda terminal_x
+    asl
+    sta VERA_ADDR_L
+    clc
+    lda terminal_y
+    adc #$b0
+    sta VERA_ADDR_M
+    lda #1
+    sta VERA_ADDR_H
+
+    ; Convert PETSCII to screen code
+    lda r0
+    clc
+
+    cmp #$20
+    bcs :+
+    adc #$80
+    bra print
+
+:   cmp #$40
+    bcc print
+
+    cmp #$60
+    bcs :+
+    adc #$c0
+    bra print
+
+:   cmp #$80
+    bcs :+
+    adc #$e0
+    bra print
+
+:   cmp #$a0
+    bcs :+
+    adc #$c0
+    bra print
+
+:   cmp #$ff
+    beq :+
+    adc #$80
+    bra print
+
+:   lda #$5e
+
+print:
+    sta VERA_DATA0
+
+    ; Move cursor position
+    inc terminal_x
+    lda terminal_x
+    cmp #80
+    bcc :+
+    stz terminal_x
+    inc terminal_y
+
+:   ; Exit function
+    clc
+    rts
+.endproc
+
+.proc on_irq
+    lda cursor_state
+    bne :+
+
+exit:
+    clc
+    rts
+
+:   dec cursor_state
+    beq show
+
+    lda cursor_state
+    cmp #30
+    bne exit
+
+hide:
+    ldx #97
+    bra update
+
+show:
+    lda #60
+    sta cursor_state
+    ldx #22
+
+update:
+    lda terminal_x
+    asl
+    inc
+    sta VERA_ADDR_L
+
+    clc
+    lda terminal_y
+    adc #$b0
+    sta VERA_ADDR_M
+    lda #1
+    sta VERA_ADDR_H
+    stx VERA_DATA0
+    
+    clc
+    rts
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Functions not (yet) implemented are pointed here
+; Input.................: None
+; Output................: None
+; Preparatory rutines...: open
+; Errors................: None
+; Preserved registers...: None
+; Credits...............: New implementation, not based on previous work
+.proc not_implemented
+    clc
+    rts
 .endproc
 
 ; *****************************************************************************
@@ -152,7 +303,7 @@ jmp_table:
 ; Errors................: .C = 1 if requesting to set unsupported mode
 ; Registers affected....: .A, .X, .Y
 ; Credits...............: New implementation, not based on previous work
-.proc terminal_mode
+.proc screen_mode
     bcs getmode
 
 setmode:
@@ -206,7 +357,6 @@ textmode:
     lda height,x
     sta screen_height
 
-    ; Set .C=1 => Success
     clc
 
 getmode:
@@ -235,3 +385,4 @@ height: .byt  60,  30,  60,  30,  15,  30,  15,  23,  50,  25,  50,  25
     screen_height: .res 1
     terminal_x: .res 1
     terminal_y: .res 1
+    cursor_state: .res 1

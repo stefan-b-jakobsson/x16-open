@@ -25,6 +25,7 @@
 ; *****************************************************************************
 
 .include "io.inc"
+.include "regs.inc"
 
 .export on_reset
 
@@ -46,52 +47,32 @@
     ; Disable interrupts
     sei
 
+    ; Set ROM bank
+    stz rom_bank
+
+    ; Initialize core device drivers
+    jsr device_init
+
     ; Initialize interrupts
     jsr irq_init
-    jsr device_init
-    ldy #0 ; Device 0 = VERA
-    ldx #0 ; Function: init
-    jsr device_call
     
-    stz VERA_ADDR_L
-    lda #$b0
-    sta VERA_ADDR_M
-    lda #%00010001
-    sta VERA_ADDR_H
-    ldx #80
-    ldy #$97
-:   lda #32
-    sta VERA_DATA0
-    sty VERA_DATA0
-    dex
-    bne :-
-    ldx #80
-    inc VERA_ADDR_M
-    stz VERA_ADDR_L
-    lda VERA_ADDR_M
-    cmp #$b0+60
-    bcc :-
-
-    stz VERA_ADDR_L
-    lda #$b0
-    sta VERA_ADDR_M
-    
-    lda #1
-    sta VERA_DATA0
-
-    cli
-
-    ldx #255
+    ; Print hello
+    ldx #0
 :   phx
-
-    ldy #0 ; Vera
-    ldx #8 ; Write
-    lda #02
+    lda hello,x
+    beq exit
+    sta r0
+    ldx #0 ; Vera
+    ldy #12 ; Write
     jsr device_call
-
     plx
-    dex
+    inx
     bne :-
 
+exit:
+    cli
 :   bra :-
+
+hello:
+    .byt "X16 OPEN KERNEL V. 0.0.1",13,0
 .endproc

@@ -26,9 +26,12 @@
 
 .include "io.inc"
 
+; Exports
 .export irq_init, on_irq_request, irq_default_handler, irq_exit
 
+; Imports
 .import __K_IRQ_LOAD__, __K_IRQ_RUN__, __K_IRQ_SIZE__
+.import device_call
 
 irq_vector = $0314
 
@@ -54,14 +57,16 @@ irq_vector = $0314
     bne :-
 
     ; Setup the IRQ vector
-    lda #<on_irq_request
+    lda #<irq_default_handler
     sta irq_vector
-    lda #>on_irq_request
+    lda #>irq_default_handler
     sta irq_vector+1
 
     ; Enable IRQ on VSYNC
     lda #1
     sta VERA_IEN
+    lda #1
+    sta VERA_ISR
 
     rts
 .endproc
@@ -77,7 +82,6 @@ irq_vector = $0314
 ; Credits...............: New implementation
 .proc on_irq_request
     ; Backup registers
-    php
     pha
     phx
     phy
@@ -95,7 +99,10 @@ irq_vector = $0314
 
 .proc irq_default_handler
     ; Work
-
+    ldx #0
+    ldy #24
+    jsr device_call
+    
     ; Clear IRQ flag
     lda #1
     sta VERA_ISR
@@ -121,7 +128,6 @@ irq_vector = $0314
     ply
     plx
     pla
-    plp
 
     ; Return
     rti

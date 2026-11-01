@@ -1,74 +1,49 @@
-.export device_init, device_call
+; *****************************************************************************
+; Copyright 2026 Stefan Jakobsson
+;
+; Redistribution and use in source and binary forms, with or without 
+; modification, are permitted provided that the following conditions are met:
+;
+; 1. Redistributions of source code must retain the above copyright notice, 
+;    this list of conditions and the following disclaimer.
+;
+; 2. Redistributions in binary form must reproduce the above copyright notice, 
+;    this list of conditions and the following disclaimer in the documentation 
+;    and/or other materials provided with the distribution.
+;
+; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
+; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
+; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
+; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+; POSSIBILITY OF SUCH DAMAGE.
+; *****************************************************************************
 
+.include "device.inc"
+.include "file.inc"
+
+; Exports
+.export device_init, device_register, device_unregister, device_call
+
+; Imports
+.import ft_driver, ft_context, ft_flags
 .import terminal_dispatch
 .import ps2kbd_dispatch
 
-DEVICE_COUNT = 16           ; Devices 0-15
-DEVICE_BUILTIN_COUNT = 5    ; Devices 0-4, can't be changed/unregistered
-
-; ******************************************************************************
-; All device drivers must implement a dispatch function that takes a driver
-; function number in the X register and additional function arguments
-; in the A register and the arg1-8 zero page registers. The dispatch function
-; must be stored at the beginning of the memory reserved for the driver.
-;
-; All device drivers must support these functions accessible through the
-; above-mentioned dispatch function:
-;
-; ------------------------------------------------------------------------------
-; #     Name        Input               Output              On error
-; ------------------------------------------------------------------------------
-; 0     init        None                A:device ID         C=1, error code in A
-;                                                           arg7-8:errmsg ptr
-
-; 1     open        A:file handle       X:file handle       C=1, error code in A
-;                   arg1-2:path         A:context           arg7-8:errmsg ptr
-;
-; 2     read_byte   A:context           A:value             C=1, error code in A
-;                                                           arg7-8:errmsg ptr
-; 
-; 3     read_block  A:context           arg1-2:data len     C=1, error code in A
-;                                       arg3-4:data ptr     arg7-8:errmsg ptr
-;
-; 4     write_byte  A:context           None                C=1, error code in A
-;                   arg1:byte                               arg7-8:errmsg ptr
-;
-; 5     write_block A:context           arg1-2:bytes left   C=1, error code in A
-;                   arg1-2:data len                         arg7-8:errmsg ptr
-;                   arg3-4:data ptr
-;
-; 6     close       A:context           None                C=1, error code in A
-;                                                           arg7-8:errmsg ptr
-;
-; 7     ioctl       A:context           arg1-8:custom       C=1, error code in A
-;                   arg1-8:custom                           arg7-8:errmsg ptr
-;
-; 8     on_irq      None                None                C=1, error code in A
-;                                                           arg7-8:errmsg ptr
-; ******************************************************************************
-
-DEVICE_INIT         = 0
-DEVICE_OPEN         = 1
-DEVICE_READ_BYTE    = 2
-DEVICE_READ_BLOCK   = 3
-DEVICE_WRITE_BYTE   = 4
-DEVICE_WRITE_BLOCK  = 5
-DEVICE_CLOSE        = 6
-DEVICE_IOCTL        = 7
-DEVICE_ON_IRQ       = 8
-
-ptr = $22
-
+; *****************************************************************************
+; Global device table
 .segment "K_LRAM"
+dt_addr:    .res DRIVER_COUNT*2
+dt_bank:    .res DRIVER_COUNT
+dt_flags:   .res DRIVER_COUNT
 
-dt_addr_lo: .res DEVICE_COUNT
-dt_addr_hi: .res DEVICE_COUNT
-dt_bank:    .res DEVICE_COUNT
-dt_flags:   .res DEVICE_COUNT   ; 0-1: Location, 2: Char/Block device, 3: Writable, 4: Readable, 5: Seekable, 6-7: Reserved
-                                ; Location: 0 = not present, 1 = ROM bank 0 or low RAM, 2 = ROM bank > 0, 3 = RAM bank
 
 .CODE
-
 ; *****************************************************************************
 ; Purpose...............: First sets all devices not present, and then
 ;                         registers built-in device drivers that are always
@@ -81,35 +56,28 @@ dt_flags:   .res DEVICE_COUNT   ; 0-1: Location, 2: Char/Block device, 3: Writab
 ;                         5: Built-in SD card driver
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation
 .proc device_init
     ; Set all devices not present
     lda #0
-    ldx #DEVICE_COUNT
+    ldx #DRIVER_COUNT
 :   sta dt_flags-1,x
     dex
     bne :-
 
-    ; #0: Register terminal driver
+    ; #0: Register terminal driver (STDOUT)
     lda #<terminal_dispatch
-    sta dt_addr_lo
+    sta dt_addr
     lda #>terminal_dispatch
-    sta dt_addr_hi
+    sta dt_addr+1
     stz dt_bank
-    lda #%00011001  ; In ROM bank 0, char device, writable, readable
+    lda #DFLAGS_NO_BANK + DFLAGS_WRITING + DFLAGS_READING + $80
     sta dt_flags
-
-    ; #1: Register PS/2 keyboard driver
-    lda #<ps2kbd_dispatch
-    sta dt_addr_lo+1
-    lda #>ps2kbd_dispatch
-    sta dt_addr_hi+1
-    stz dt_bank+1
-    lda #%00010001  ; In ROM bank 0, char device, readable
-    sta dt_flags+1
+    ldx #0
+    ldy #0
+    jsr device_call
 
     ; #2: Register PS/2 mouse driver
     ; TODO...
@@ -124,38 +92,81 @@ dt_flags:   .res DEVICE_COUNT   ; 0-1: Location, 2: Char/Block device, 3: Writab
 .endproc
 
 ; *****************************************************************************
-; Purpose...............: Calls device driver function
-; Input.................: X     Function number
-;                         Y     Driver number
-;                         A     Primary function argument
-;                         p0-7  Additional function arguments
+; Purpose...............: Registers a new device driver
+; Input.................: X         Driver number
+;                         r0-1      Driver address
+;                         r2        Driver bank
+; Output................: A         Device driver ID
+; Errors................: C         Set on error
+;                         A         Error code, ENODEVSPC, EDEVBUSY, EIO
+; Preserved registers...: None
+; Credits...............: New implementation
+.proc device_register
+    clc
+    rts
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Unregisters a device driver
+; Input.................: X         Driver number
+
 ; Output................: None
-; Preparatory rutines...: None
-; Errors................: None
+; Errors................: C         Set on error
+;                         A         Error code, EDEVBUSY, EIO
+; Preserved registers...: None
+; Credits...............: New implementation
+.proc device_unregister
+    clc
+    rts
+.endproc
+
+
+; *****************************************************************************
+; Purpose...............: Calls device driver function, used internally
+;                         by the kernel
+; Input.................: X         Driver number
+;                         Y         Function number
+;                         A         Primary function argument
+;                         r0-13     Additional function arguments
+; Output................: Set by driver function
+; Errors................: C = 1
 ; Preserved registers...: None
 ; Credits...............: New implementation
 .proc device_call
+    ; Backup A
     pha
-    lda dt_addr_lo,y
-    sta ptr
-    lda dt_addr_hi,y
-    sta ptr+1
-    lda dt_flags,y
-    and #3 ; The flag register bits 0-1: 0=device not present, 1=Stored in ROM bank 0 or low RAM, 2=Stored in ROM bank>0, 3=Stored in RAM bank
+    
+    ; Check driver flag bits 5-6, where 
+    ;   00 = device not present
+    ;   01 = Stored in ROM bank 0 or low RAM
+    ;   10 = Stored in ROM bank > 0
+    ;   11 = Stored in RAM bank
+    lda dt_flags,x
+    and #$60
     beq not_present
-    cmp #2
+    cmp #$40
     bcs banking_required
 
 no_banking:
+    ; Driver number * 2
+    txa
+    asl
+    tax
+    
+    ; Restore A
     pla
-    jmp (ptr)
+
+    ; Call driver
+    jmp (dt_addr,x)
 
 not_present:
     pla
+    sec
     rts
     
 banking_required:
     ; TODO: Not yet implemented ...
     pla
+    sec
     rts
 .endproc

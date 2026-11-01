@@ -1,0 +1,28 @@
+; Device driver functions
+DRIVER_ON_REGISTER      = 0
+DRIVER_ON_UNREGISTER    = 2
+DRIVER_OPEN             = 4
+DRIVER_DUP              = 6
+DRIVER_READ_BYTE        = 8
+DRIVER_READ_BLOCK       = 10
+DRIVER_WRITE_BYTE       = 12
+DRIVER_WRITE_BLOCK      = 14
+DRIVER_SEEK             = 16
+DRIVER_POSITION         = 18
+DRIVER_CLOSE            = 20
+DRIVER_IOCTL            = 22
+DRIVER_ON_IRQ           = 24
+DRIVER_STRING           = 26
+
+; Device table size
+DRIVER_COUNT = 16
+
+; Device table flags
+DFLAGS_READING      = (%00000001)
+DFLAGS_WRITING      = (%00000010)
+DFLAGS_APPENDING    = (%00000100)
+DFLAGS_SEEKING      = (%00001000)
+DFLAGS_BLOCKDEV     = (%00010000)
+DFLAGS_NO_BANK      = (%00100000)
+DFLAGS_ROM_BANK     = (%01000000)
+DFLAGS_RAM_BANK     = (%01100000)
