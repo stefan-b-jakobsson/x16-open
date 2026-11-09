@@ -3,7 +3,7 @@ LD = ld65
 
 ASFLAGS += -I include
 ASFLAGS += -g
-ASFLAGS += --cpu 65SC02
+ASFLAGS += --cpu 65C02
 
 BUILD_DIR = build
 CONF_DIR = config
@@ -15,16 +15,22 @@ report := $(subst /,_,$(target))
 
 # Kernal resources
 KERNEL_SOURCES = \
-	kernel/drivers/petscii.asm \
+	kernel/sys/signature.asm \
+	kernel/sys/jmptable.asm \
+	kernel/drivers/i2c.asm \
 	kernel/drivers/ps2kbd.asm \
 	kernel/drivers/terminal.asm \
+	kernel/font/font.asm \
 	kernel/ramcode/jsrfar.asm \
+	kernel/shell/shell.asm \
 	kernel/sys/device.asm \
 	kernel/sys/irq.asm \
+	kernel/sys/mem.asm \
+	kernel/sys/misc.asm \
 	kernel/sys/nmi.asm \
 	kernel/sys/reset.asm \
 	kernel/sys/vectors.asm \
-	kernel/sys/file.asm
+	kernel/sys/file.asm \
 
 BANK_BINS = \
 	$(BUILD_DIR)/kernel.bin \

@@ -27,7 +27,7 @@
 ; Imports
 .import on_nmi, on_reset, on_irq_request
 
-; CPU hardware vectors at address $fffa-$ffff
+; Hardware vectors at address $fffa-$ffff
 .segment "K_VECT"
     .word on_nmi
     .word on_reset

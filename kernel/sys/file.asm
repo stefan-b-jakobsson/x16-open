@@ -30,12 +30,14 @@
 .include "error.inc"
 
 ; Exports
-.export file_open, file_dup, file_close
+.export ft_driver, ft_flags
+.export file_init
+.export file_open, file_close
 .export file_read_byte, file_read_block, stdin_read
 .export file_write_byte, file_write_block, stdout_write
 .export file_seek, file_position
 .export file_ioctl
-.export ft_driver, ft_context, ft_flags
+.export std_get, std_set
 
 ; Imports
 .import device_call
@@ -43,11 +45,72 @@
 ; *****************************************************************************
 ; Kernel file table
 .segment "K_LRAM"
-ft_driver:      .res FILE_HANDLES_COUNT
-ft_context:     .res FILE_HANDLES_COUNT
-ft_flags:       .res FILE_HANDLES_COUNT
+ft_driver:      .res FILE_COUNT
+ft_context:     .res FILE_COUNT
+ft_flags:       .res FILE_COUNT
+std_streams:    .res STD_COUNT
 
 .CODE
+
+; *****************************************************************************
+; Purpose...............: Initializes the kernel's file table and functions
+; Input.................: None
+; Output................: None
+; Preparatory rutines...: device_init
+; Errors................: C         Set on error
+;                         A         Error code, ENODEV, ENOFILESPC, EFILEOPEN, 
+;                                   ENOTFILE, ENOTFOUND, EINVAL, EIO
+; Registers affected....: A, X, Y, P
+; Credits...............: New implementation
+.proc file_init
+    ; Disable interrupts
+    php
+    cli
+
+    ; Clear file table
+    lda #0
+    ldx #FILE_COUNT
+:   sta ft_flags-1,x
+    dex
+    bne :-
+
+    ; Open STDIN as file #0
+    ldx #0
+    ldy #DEVICE_KEYBOARD
+    lda #FILE_FOR_READING
+    jsr file_open
+    bcs err
+    stx std_streams+STDIN-$80   ; Connect file handle to STDIN
+
+    ; Open STDOUT as file #1
+    ldx #1
+    ldy #DEVICE_TERMINAL
+    lda #FILE_FOR_WRITING
+    jsr file_open
+    bcs err
+    stx std_streams+STDOUT-$80  ; Connect file handle to STDOUT
+
+    ; Open STD_MOUSE as file #2
+    ; TODO: Not yet implemented
+    lda #$ff
+    sta std_streams+STDMOUSE-$80
+
+    ; Open STD_GAME as file #3
+    ; TODO: Not yet implemented
+    lda #$ff
+    sta std_streams+STDGAME-$80
+
+exit:
+    plp ; Restore IRQ
+    clc
+    rts
+
+err:
+    plp ; Restore IRQ
+    sec
+    rts
+.endproc
+
 ; *****************************************************************************
 ; Purpose...............: Opens a file
 ; Input.................: X         File handle or $ff to request next available
@@ -60,34 +123,36 @@ ft_flags:       .res FILE_HANDLES_COUNT
 ;                         A         Flags
 ; Preparatory rutines...: device_register
 ; Errors................: C         Set on error
-;                         A         Error code,  ENODEV, ENOFILESPC, EFILEOPEN, 
+;                         A         Error code, ENODEV, ENOFILESPC, EFILEOPEN, 
 ;                                   ENOTFILE, ENOTFOUND, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, X, Y, P
 ; Credits...............: New implementation
 .proc file_open
     ; Backup flags
     pha
 
-@0: ; Valid file handle?
-    cpx #FILE_HANDLES_COUNT
-    bcs @1
+    ; Valid file handle?
+    cpx #FILE_COUNT
+    bcs search
     lda ft_flags,x
-    bpl @2 
-    bra err1 ; File handle already open
+    bpl prepare 
+    bra err_open ; File handle already open
 
-@1: ; Find next file handle if X = $ff
+search: 
+    ; Search next file handle if X = $ff
     cpx #$ff
-    bne err2 ; Invalid file handle
+    bne err_invalid ; Invalid file handle
 
     ldx #0
     lda ft_flags,x
-    bpl @2 ; Bit 7 clear, file handle available
+    bpl prepare ; Bit 7 clear, file handle available
     inx
-    cpx #FILE_HANDLES_COUNT
-    bcs err3 ; Too many files
+    cpx #FILE_COUNT
+    bcs err_toomany ; Too many files
 
-@2: ; Prepare to call device driver
-    tya
+prepare:
+    ; Prepare to call device driver
+    tya ; Device ID
     sta ft_driver,x ; Store device ID in file table
     pla ; Get flags from stack
     phx ; Backup file handle
@@ -111,17 +176,17 @@ ft_flags:       .res FILE_HANDLES_COUNT
     clc
     rts
 
-err1:
+err_open:
     ; File open
-    lda #ENOTOPEN
+    lda #EFILEOPEN
     bra err
 
-err2:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err3:
+err_toomany:
     ; Too many files
     lda #ENOFILESPC
 
@@ -132,119 +197,73 @@ err:
 .endproc
 
 ; *****************************************************************************
-; Purpose...............: Duplicates a file
-; Input.................: X         Source file handle
-;                         Y         Destination file handle
-; Output................: Y         Destination file handle
-; Preparatory rutines...: file_open
-; Errors................: C         Set on error
-;                         A         Error code, ENOFILESPC, ENOTOPEN, EFILEOPEN, 
-;                                   EINVAL, EIO
-; Preserved registers...: None
-; Credits...............: New implementation
-.proc file_dup
-    ; Save destination file handle on stack
-    phy
-
-    ; Check if source file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
-
-    ; Check if destination file is valid
-    cpy #FILE_HANDLES_COUNT
-    bcs err0
-
-    ; Check if source file is open
-    lda ft_flags,x
-    bpl err1 ; Source file not open
-
-    ; Check if destination file is closed
-    lda ft_flags,y
-    bmi err2 ; Destination file is already open
-
-    ; Copy file table entry
-    lda ft_flags,x
-    sta ft_flags,y
-    lda ft_driver,x
-    sta ft_driver,y
-    lda ft_context,x
-    sta ft_context,y
-
-    ; Call device driver's dup function
-    ldx ft_driver,y
-    ldy #DRIVER_DUP
-    jsr device_call
-    bcs err
-
-    ; Exit
-    ply ; Get destination file handle from stack
-    clc
-    rts
-
-err0:
-    ; Invalid file handle
-    lda #EINVAL
-    bra err
-
-err1:
-    ; Source file not open
-    lda #ENOTOPEN
-    bra err
-
-err2:
-    ; Destination file is open
-    lda #EFILEOPEN
-    bra err
-
-err:
-    ply
-    sec
-    rts
-.endproc
-
-; *****************************************************************************
-; Purpose...............: Closes a file
-; Input.................: X file handle
-; Output................: None
+; Purpose...............: Closes a file; the file is not marked as closed
+;                         if calling the driver's close function returns an
+;                         error
+; Input.................: X     File handle or standard stream
+; Output................: X     Input preserved
 ; Preparatory rutines...: Call file_open to open a file
 ; Errors................: C     set on error
 ;                         A     error code, EINVAL, ENOTOPEN, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc file_close
-    ; Check if file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
 
+    cpx #$80
+    bcc err_invalid
+
+    cpx #$80 + STD_COUNT
+    bcs err_invalid
+
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Check if file is open
     lda ft_flags,x
-    bpl err1
-
-    ; Update file table
-    lda #0
-    sta ft_flags,x
+    bpl err_notopen
     
+    ; Backup X and Y on stack
+    phx
+    phy
+
     ; Call driver's close function
     ldy ft_context,x
     lda ft_driver,x
     tax
     tya
-    ldy #DRIVER_CLOSE 
+    ldy #DRIVER_CLOSE
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit sucessfully
-    clc
+    ; Restore X and Y from stack
+    ply
+    plx
+
+    ; Update file table
+    lda #0
+    sta ft_flags,x
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File not open
     lda #ENOTOPEN
+    bra err
+
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
 
 err:
     sec
@@ -253,23 +272,39 @@ err:
 
 ; *****************************************************************************
 ; Purpose...............: Reads one byte from an open file
-; Input.................: X     File handle
+; Input.................: X     File handle or standard stream
 ; Output................: A     Byte value
+;                         X     Preserved
+;                         Y     Preserved
 ; Preparatory rutines...: file_open
 ; Errors................: C     Set on error
 ;                         A     Error code, ENOTOPEN, EINVAL, EEOF, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc file_read_byte
     ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    cpx #FILE_COUNT
+    bcc isopen
 
+    cpx #$80
+    bcc err_invalid
+    
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+    
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file opened for reading
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen ; Not open
     and #FILE_FOR_READING
-    beq err1 ; Not open for reading
+    beq err_invalid ; Not open for reading
+
+    ; Backup X and Y on stack
+    phx
+    phy
 
     ; Call driver's read_byte function
     ldy ft_context,x
@@ -278,21 +313,29 @@ err:
     tya
     ldy #DRIVER_READ_BYTE
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit successfully
-    clc
+    ; Restore X and Y from stack
+    ply
+    plx
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File closed or not opened for reading
     lda #ENOTOPEN
     bra err
+
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
 
 err:
     sec
@@ -301,7 +344,7 @@ err:
 
 ; *****************************************************************************
 ; Purpose...............: Reads a block from an open file
-; Input.................: X         File handle
+; Input.................: X         File handle or standard stream
 ;                         r0-1      Number of bytes requested
 ;                         r2-3      Buffer address
 ;                         r4        Buffer bank
@@ -309,18 +352,32 @@ err:
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EEOF, EIO
-; Preserved registers...: None
+; Registers affected....: A, P, r0-1, r5-6
 ; Credits...............: New implementation
 .proc file_read_block
     ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    cpx #FILE_COUNT
+    bcc isopen
 
+    cpx #$80
+    bcc err_invalid
+
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file opened for reading
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen ; Not open
     and #FILE_FOR_READING
-    beq err1 ; Not open for reading
+    beq err_invalid ; Not open for reading
+
+    ; Backup X and Y on stack
+    phx
+    phy
 
     ; Call driver's read_block function
     ldy ft_context,x
@@ -329,51 +386,74 @@ err:
     tya
     ldy #DRIVER_READ_BLOCK
     jsr device_call
-    bcs err
+    bcs err_driver
     
+    ; Restore X and Y from stack
+    ply
+    plx
+
     ; Exit successfully
-    clc
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File closed or not opened for reading
     lda #ENOTOPEN
     bra err
 
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
+
 err:
     sec
     rts  
-
 .endproc
 
 ; *****************************************************************************
 ; Purpose...............: Writes a byte to an open file
-; Input.................: X     File handle
+; Input.................: X     File handle or standard stream
 ;                         A     Byte value
 ; Output................: None
 ; Preparatory rutines...: file_open
 ; Errors................: C     Set on error
 ;                         A     Error code, ENOTOPEN, ENOTFILE, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc file_write_byte
+    ; Backup X, Y and r0 on stack
+    phx
+    phy
+    ldy r0
+    phy
+
     ; Store byte value in r0
     sta r0
     
-    ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
 
+    cpx #$80
+    bcc err_invalid
+
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file opened for writing or appending
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen ; Not open
     and #FILE_FOR_WRITING + FILE_FOR_APPENDING
-    beq err1 ; Not open for writing/appending
+    beq err_invalid ; Not open for writing/appending
 
     ; Call driver's write_byte function
     ldy ft_context,x
@@ -384,28 +464,39 @@ err:
     jsr device_call
     bcs err
 
-    ; Exit successfully
-    clc
+    ; Restore X, Y and r0 from stack
+    ply
+    sty r0
+    ply
+    plx
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File closed or not opened for writing or appending
     lda #ENOTOPEN
 
 err:
+    ; Restore X, Y and r0 from stack
+    ply
+    sty r0
+    ply
+    plx
+
+    ; Exit
     sec
     rts  
-    
 .endproc
 
 ; *****************************************************************************
 ; Purpose...............: Writes a block to an open file
-; Input.................: X         File handle
+; Input.................: X         File handle or standard stream
 ;                         r0-1      Buffer size
 ;                         r2-3      Buffer address
 ;                         r4        Buffer bank
@@ -413,18 +504,31 @@ err:
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, ENOTFILE, EINVAL, EIO
-; Preserved registers...: None
+; Affected registers....: A, P, r5-6
 ; Credits...............: New implementation
-.proc file_write_block    
-    ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+.proc file_write_block
+    ; Backup X and Y on stack
+    phx
+    phy
 
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
+
+    cpx #$80
+    bcc err_invalid
+    cpx #$80 + STD_COUNT
+    bcs err_invalid
+
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file opened for writing or appending
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen ; Not open
     and #FILE_FOR_WRITING + FILE_FOR_APPENDING
-    beq err1 ; Not open for writing/appending
+    beq err_invalid ; Not open for writing/appending
 
     ; Call driver's write_block function
     ldy ft_context,x
@@ -433,25 +537,99 @@ err:
     tya
     ldy #DRIVER_WRITE_BLOCK
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit successfully
-    clc
+    ; Restore X and Y from stack
+    ply
+    plx
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File closed or not opened for writing or appending
     lda #ENOTOPEN
     bra err
 
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
+
 err:
     sec
     rts  
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Connects a file to a standard stream
+; Input.................: X         File handle
+;                         Y         Standard stream
+; Output................: None
+; Preparatory rutines...: file_open
+; Errors................: C         Set on error
+;                         A         Error code, ENOTOPEN, EINVAL
+; Registers affected....: A, P
+; Credits...............: New implementation
+.proc std_set
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcs err_invalid
+
+    cpy #STD_COUNT
+    bcs err_invalid
+
+    lda ft_flags,x
+    bpl err_notopen
+
+    ; Update standard stream
+    txa
+    sta std_streams,y
+
+    ; Exit
+    clc
+    rts
+
+err_invalid:
+    lda #EINVAL
+    bra err
+
+err_notopen:
+    lda #ENOTOPEN
+
+err:
+    sec
+    rts
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Returns file connected to a standard stream
+; Input.................: Y         Standard stream
+; Output................: X         File handle
+; Preparatory rutines...: file_open
+; Errors................: C         Set on error
+;                         A         Error code, EINVAL
+; Registers affected....: A, P
+; Credits...............: New implementation
+.proc std_get
+    ; Check if valid standard stream
+    cpy #STD_COUNT
+    bcs err_invalid
+
+    ; Get value and exit
+    ldx std_streams,y
+    clc
+    rts
+
+err_invalid:
+    lda #EINVAL
+    sec
+    rts
 .endproc
 
 ; *****************************************************************************
@@ -461,11 +639,19 @@ err:
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EEOF, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc stdin_read
-    ldx #0
-    jmp file_read_byte
+    ; Preserve X on stack
+    phx
+
+    ; Read byte
+    ldx #STDIN
+    jsr file_read_byte
+
+    ; Restore X and exit
+    plx
+    rts
 .endproc
 
 ; *****************************************************************************
@@ -475,33 +661,51 @@ err:
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc stdout_write
-    ldx #1
-    jmp file_write_byte
+    ; Backup X on stack
+    phx
+
+    ; Read byte
+    ldx #STDOUT
+    jsr file_write_byte
+
+    ; Restore X and exit
+    plx
+    rts
 .endproc
 
 ; *****************************************************************************
 ; Purpose...............: Seeks a position in an open file
-; Input.................: X         File handle
+; Input.................: X         File handle or standard stream
 ;                         r0-3      Requested file position
 ; Output................: r0-3      New file position
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, P, r0-3
 ; Credits...............: New implementation
 .proc file_seek
-    ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
 
-    ; Verify file opened for reading
+    cpx #$80
+    bcc err_invalid
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+    lda std_streams-$80,x
+    tax
+
+isopen:
+    ; Verify file open
     lda ft_flags,x
-    bpl err1 ; Not open
-    and #FILE_FOR_READING
-    beq err1 ; Not open for reading
+    bpl err_notopen ; Not open
+
+    ; Backup X and Y on stack
+    phx
+    phy
 
     ; Call driver's seek function
     ldy ft_context,x
@@ -510,21 +714,29 @@ err:
     tya
     ldy #DRIVER_SEEK
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit successfully
-    clc
+    ; Restore X and Y from stack
+    ply
+    plx
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File closed or not opened for reading
     lda #ENOTOPEN
     bra err
+
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
 
 err:
     sec
@@ -533,21 +745,33 @@ err:
 
 ; *****************************************************************************
 ; Purpose...............: Returns current file position
-; Input.................: X         File handle
+; Input.................: X         File handle or standard stream
 ; Output................: r0-3      File position
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, P, r0-3
 ; Credits...............: New implementation
 .proc file_position
-    ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+     ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
 
+    cpx #$80
+    bcc err_invalid
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file open
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen ; Not open
+
+    ; Preserve X and Y on stack
+    phx
+    phy
 
     ; Call driver's position function
     ldy ft_context,x
@@ -556,20 +780,29 @@ err:
     tya
     ldy #DRIVER_POSITION
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit successfully
-    clc
+    ; Restore X and Y from stack
+    ply
+    plx
+
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File not open
     lda #ENOTOPEN
+    bra err
+
+err_driver:
+    ; Restore X and Y from stack
+    ply
+    plx
 
 err:
     sec
@@ -578,7 +811,7 @@ err:
 
 ; *****************************************************************************
 ; Purpose...............: Driver-specific control command
-; Input.................: X         File handle
+; Input.................: X         File handle or standard stream
 ;                         r0        Device type
 ;                         r1        Command
 ;                         r2        Input length
@@ -591,16 +824,28 @@ err:
 ; Preparatory rutines...: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
-; Preserved registers...: None
+; Registers affected....: A, P
 ; Credits...............: New implementation
 .proc file_ioctl
-    ; Verify file handle is valid
-    cpx #FILE_HANDLES_COUNT
-    bcs err0
+    ; Backup X and Y
+    phx
+    phy
 
+    ; Verify file handle
+    cpx #FILE_COUNT
+    bcc isopen
+
+    cpx #$80
+    bcc err_invalid
+    cpx #$80+STD_COUNT
+    bcs err_invalid
+    lda std_streams-$80,x
+    tax
+
+isopen:
     ; Verify file open
     lda ft_flags,x
-    bpl err1 ; Not open
+    bpl err_notopen
 
     ; Call driver's position function
     ldy ft_context,x
@@ -609,20 +854,29 @@ err:
     tya
     ldy #DRIVER_IOCTL
     jsr device_call
-    bcs err
+    bcs err_driver
 
-    ; Exit successfully
-    clc
+    ; Restore X and Y
+    ply
+    plx
+    
+    ; Exit
     rts
 
-err0:
+err_invalid:
     ; Invalid file handle
     lda #EINVAL
     bra err
 
-err1:
+err_notopen:
     ; File not open
     lda #ENOTOPEN
+    bra err
+
+err_driver:
+    ; Restore X and Y
+    ply
+    plx
 
 err:
     sec

@@ -24,34 +24,69 @@
 ; POSSIBILITY OF SUCH DAMAGE.
 ; *****************************************************************************
 
+.include "regs.inc"
+.include "version.inc"
+
 ; Exports
-.export get_ticks, set_ticks
+.export get_ticks, set_ticks, tick
 .export get_errmsg, set_errmsg
 .export sys_info
 
+; Variables
+.segment "K_LRAM"
+jiffies: .res 3
+
+.CODE
 ; *****************************************************************************
-; Purpose...............: Returns the jiffy clock counter
+; Purpose...............: Returns the jiffy counter
 ; Input.................: None
-; Output................: r0-2    Tick counter
+; Output................: A     Counter value, bits 0-7
+;                         X     Counter value, bits 8-15
+;                         Y     Counter value, bits 16-23
 ; Preparatory rutines...: None
 ; Errors................: None
-; Preserved registers...: None
+; Registers affected....: A, X, Y, P
 ; Credits...............: New implementation
 .proc get_ticks
-    ; TODO: Fix this
+    lda jiffies
+    ldx jiffies+1
+    ldy jiffies+2
     rts
 .endproc
 
 ; *****************************************************************************
-; Purpose...............: Sets the jiffy clock counter
-; Input.................: r0-2    Tick counter
+; Purpose...............: Sets the jiffy counter
+; Input.................: A     Counter value, bits 0-7
+;                         X     Counter value, bits 8-15
+;                         Y     Counter value, bits 16-23
 ; Output................: None
 ; Preparatory rutines...: None
 ; Errors................: None
-; Preserved registers...: None
+; Registers affected....: None
 ; Credits...............: New implementation
 .proc set_ticks
-    ; TODO: Fix this
+    sta jiffies
+    stx jiffies+1
+    sty jiffies+2
+    rts
+.endproc
+
+; *****************************************************************************
+; Purpose...............: Increments jiffy counter
+; Input.................: None
+; Output................: None
+; Preparatory rutines...: None
+; Errors................: None
+; Registers affected....: P
+; Credits...............: New implementation
+.proc tick
+    inc jiffies
+    bne exit
+    inc jiffies+1
+    bne exit
+    inc jiffies+2
+    
+exit:
     rts
 .endproc
 
@@ -63,10 +98,10 @@
 ;                         r2        Error message bank
 ; Preparatory rutines...: None
 ; Errors................: None
-; Preserved registers...: None
+; Registers affected....: A, r0-2
 ; Credits...............: New implementation
 .proc get_errmsg
-    ; TODO: Fix this
+    ; TODO: Not yet implemented
     rts
 .endproc
 
@@ -78,10 +113,10 @@
 ; Output................: None
 ; Preparatory rutines...: None
 ; Errors................: None
-; Preserved registers...: None
+; Registers affected....: None
 ; Credits...............: New implementation
 .proc set_errmsg
-    ; TODO: Fix this
+    ; TODO: Not yet implemented
     rts
 .endproc
 
@@ -89,13 +124,29 @@
 ; Purpose...............: Returns system information
 ; Input ................: None
 ; Output................: r0-2      Kernel version (major, minor, patch)
-;                         r3-4      String buffer address
-;                         r5        String buffer bank
+;                         r3-4      String buffer address in ROM bank 0
 ; Preparatory rutines...: None
 ; Errors................: None
-; Preserved registers...: None
+; Registers affected....: None
 ; Credits...............: New implementation
 .proc sys_info
-    ; TODO: Fix this
+    ; Set kernel version
+    lda #version_major
+    sta r0
+    lda #version_minor
+    sta r1
+    lda #version_patch
+    sta r2
+
+    ; Set string address
+    lda #<str
+    sta r3
+    lda #>str
+    sta r4
+
+    ; Exit
     rts
+
+str:
+    .byt .sprintf("X16 OPEN KERNEL V %u.%u.%u", version_major, version_minor, version_patch), 13, 13, 0
 .endproc

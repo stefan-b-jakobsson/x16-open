@@ -38,17 +38,16 @@ rowfoot = 0}
 0   & on\_register      & Called when the device driver is registered \\
 2   & on\_unregister    & Called when the device driver is unregistered \\
 4   & open              & Opens a file \\
-6   & dup               & Called when a file handle is duplicated \\
-8   & read\_byte        & Reads one byte from a file \\
-10  & read\_block       & Reads one block of bytes from a file \\
-12  & write\_byte       & Writes one byte to a file \\
-14  & write\_block      & Writes a block of bytes to a file \\
-16  & seek              & Moves the file pointer \\
-18  & position          & Returns the file pointer \\
-20  & close             & Closes a file \\
-22  & ioctl             & Driver control command \\
-24  & on\_irq           & Called on every IRQ \\
-26  & driver\_string    & Returns driver name and version \\
+6   & read\_byte        & Reads one byte from a file \\
+8  & read\_block       & Reads one block of bytes from a file \\
+10  & write\_byte       & Writes one byte to a file \\
+12  & write\_block      & Writes a block of bytes to a file \\
+14  & seek              & Moves the file pointer \\
+16  & position          & Returns the file pointer \\
+18  & close             & Closes a file \\
+20  & ioctl             & Driver control command \\
+22  & on\_irq           & Called on every IRQ \\
+24  & driver\_string    & Returns driver name and version \\
 \end{longtblr}
 
 
@@ -129,28 +128,9 @@ not supported by the device, or if not exactly one of the flags was set.
 EIO is a driver-specific error.
 
 
-\section{Function: dup}
-
-\textbf{Function \#:} 6 \\
-\textbf{Input:} A = Context ID \\
-\textbf{Output:} None \\
-\textbf{Errors:} ENOTOPEN, EIO
-
-Called by the kernel when a file handle is duplicated without
-opening a new file. If necessary, the driver is responsible for
-keeping track of the number of references to each file context.
-
-When calling the close function, the driver will typically
-decrement the reference counter, and, if 0, close the file.
-
-ENOTOPEN is returned if the context is not active.
-
-EIO is a driver-specific error.
-
-
 \section{Function: read\_byte}
 
-\textbf{Function \#:} 8 \\
+\textbf{Function \#:} 6 \\
 \textbf{Input:} A = Context ID \\
 \textbf{Output:} A = Byte value \\
 \textbf{Errors:} ENOTOPEN, EEOF, EIO
@@ -172,7 +152,7 @@ EIO is a driver-specific error.
 
 \section{Function: read\_block}
 
-\textbf{Function \#:} 10 \\
+\textbf{Function \#:} 8 \\
 \textbf{Input:} A = Context ID, r0-1 = Requested number of bytes, r2-3 = Buffer address, r4 = Buffer bank \\
 \textbf{Output:} r5-6 = Number of bytes read \\
 \textbf{Errors:} ENOTOPEN, EEOF, EIO
@@ -198,7 +178,7 @@ EIO is a driver-specific error.
 
 \section{Function: write\_byte}
 
-\textbf{Function \#:} 12 \\
+\textbf{Function \#:} 10 \\
 \textbf{Input:} A = Context ID, r0 = Byte value \\
 \textbf{Output:} None \\
 \textbf{Errors:} ENOTOPEN, ENOTFILE, EIO
@@ -218,7 +198,7 @@ EIO is a driver-specific error.
 
 \section{Function: write\_block}
 
-\textbf{Function \#:} 14 \\
+\textbf{Function \#:} 12 \\
 \textbf{Input:} A = Context ID, r0-1 = Buffer size, r2-3 = Buffer address, r4 = Buffer bank \\
 \textbf{Output:} r5-6 = Number of bytes written \\
 \textbf{Errors:} ENOTOPEN, ENOTFILE, EIO
@@ -241,7 +221,7 @@ EIO is a driver-specific error.
 
 \section{Function: seek}
 
-\textbf{Function \#:} 16 \\
+\textbf{Function \#:} 14 \\
 \textbf{Input:} A = Context ID, r0-3 = New position \\
 \textbf{Output:} r0-3 = Current position \\
 \textbf{Errors:} EINVAL, ENOTOPEN, EIO
@@ -265,7 +245,7 @@ EIO is a driver-specific error.
 
 \section{Function: position}
 
-\textbf{Function \#:} 18 \\
+\textbf{Function \#:} 16 \\
 \textbf{Input:} A = Context ID \\
 \textbf{Output:} r0-3 = File position \\
 \textbf{Errors:} EINVAL, ENOTOPEN, EIO
@@ -282,7 +262,7 @@ EIO is a driver-specific error.
 
 \section{Function: close}
 
-\textbf{Function \#:} 20 \\
+\textbf{Function \#:} 18 \\
 \textbf{Input:} A = Context ID \\
 \textbf{Output:} None \\
 \textbf{Errors:} ENOTOPEN, EIO
@@ -298,9 +278,9 @@ EIO is a driver-specific error.
 
 \section{Function: ioctl}
 
-\textbf{Function \#:} 22 \\
+\textbf{Function \#:} 20 \\
 \textbf{Input:} A = Context ID, r0 = Device type, r1 = Command, r2 = Input length, r3-4 = Input data or input buffer address, r5 = Input buffer bank,
-r6 = Output max length, r7-8 = Output buffer address, r9 = Output buffer bank \\
+r6-7 = Output buffer address, r8 = Output buffer bank, r9 = Output buffer max length \\
 \textbf{Output:} A = Output length \\
 \textbf{Errors:} EIO
 
@@ -313,7 +293,7 @@ The device type is passed in r0. A driver for a specific device type is expected
 handle certain control commands.
 
 The control command is specified in r1. The two most significant bits are used to flag if the input 
-(r3-5) and output (r7-9) are direct values or buffer pointers. Direct values can be at most two bytes long.
+(r3-5) and output (r6-8) are direct values or buffer pointers. Direct values can be at most two bytes long.
 
 \begin{itemize}
     \item Bit 7: Set if output is a direct value, clear if output is a buffer pointer.
@@ -331,10 +311,10 @@ The input is specified in r2-5:
 The output is specified in r6-9 and the A register:
 
 \begin{itemize}
-    \item r6: Output max length set by the caller.
-    \item r7-8: A direct value (r1 bit 7 set) set by the driver or output buffer address set by the caller (r1 bit 7 clear).
-    \item r9: Output buffer bank set by the caller (r1 bit 7 clear).
+    \item r6-7: A direct value (r1 bit 7 set) set by the driver or output buffer address set by the caller (r1 bit 7 clear).
+    \item r8: Output buffer bank set by the caller (r1 bit 7 clear).
     \item A: Output length set by the driver.
+    \item r9: Output max length set by the caller.
 \end{itemize}
 
 EIO is a driver-specific error.
@@ -342,7 +322,7 @@ EIO is a driver-specific error.
 
 \section{Function: on\_irq}
 
-\textbf{Function \#:} 24 \\
+\textbf{Function \#:} 22 \\
 \textbf{Input:} None \\
 \textbf{Output:} None \\
 \textbf{Errors:} EIO
@@ -358,7 +338,7 @@ EIO is a driver-specific error.
 
 \section{Function: driver\_string}
 
-\textbf{Function \#:} 26 \\
+\textbf{Function \#:} 24 \\
 \textbf{Input:} None \\
 \textbf{Output:} r0-1 = String address, r2 = String bank \\
 \textbf{Errors:} None

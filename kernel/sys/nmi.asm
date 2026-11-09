@@ -30,8 +30,7 @@
 .CODE
 
 ; *****************************************************************************
-; Purpose...............: Default NMI handler, called by the NMI vector
-;                         at $fffa
+; Purpose...............: Target for hardware NMI vector ($fffa)
 ; Input.................: None
 ; Output................: None
 ; Preparatory rutines...: None

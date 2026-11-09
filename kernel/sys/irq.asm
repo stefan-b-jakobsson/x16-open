@@ -31,7 +31,8 @@
 
 ; Imports
 .import __K_IRQ_LOAD__, __K_IRQ_RUN__, __K_IRQ_SIZE__
-.import device_call
+.import device_call, device_on_irq
+.import tick
 
 irq_vector = $0314
 
@@ -72,8 +73,7 @@ irq_vector = $0314
 .endproc
 
 ; *****************************************************************************
-; Purpose...............: Default IRQ handler, called by the IRQ vector
-;                         at $fffe
+; Purpose...............: Target for the hardware IRQ vector ($fffe)
 ; Input.................: None
 ; Output................: None
 ; Preparatory rutines...: None
@@ -81,7 +81,7 @@ irq_vector = $0314
 ; Preserved registers...: None
 ; Credits...............: New implementation
 .proc on_irq_request
-    ; Backup registers
+    ; Backup registers, status register backup up by the hardware
     pha
     phx
     phy
@@ -97,11 +97,20 @@ irq_vector = $0314
     jmp (irq_vector)
 .endproc
 
+; *****************************************************************************
+; Purpose...............: Default IRQ handler
+; Input.................: None
+; Output................: None
+; Preparatory rutines...: None
+; Errors................: None
+; Preserved registers...: None
+; Credits...............: New implementation
 .proc irq_default_handler
-    ; Work
-    ldx #0
-    ldy #24
-    jsr device_call
+    ; Device IRQ functions
+    jsr device_on_irq
+
+    ; Increment jiffy clock
+    jsr tick
     
     ; Clear IRQ flag
     lda #1

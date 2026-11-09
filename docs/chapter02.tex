@@ -8,10 +8,10 @@
 
 \section{Introduction}
 
-Most of the work in the system is done by device drivers. The kernel is
+Most of the work in the system is done by device drivers. The Kernel is
 just a thin layer that provides a common interface to the drivers.
 
-The core device drivers required to start the system are embedded into the kernel ROM bank (bank 0).
+The core device drivers required to start the system are embedded into the Kernel ROM bank (bank 0).
 Other device drivers, including alternatives to the core drivers, can be stored
 in ROM banks 1-255 or even be loaded into RAM at runtime.
 
@@ -19,13 +19,13 @@ You are free to decide what device drivers are used for different tasks. If you,
 a USB keyboard instead of the default PS/2 keyboard, it is possible to load and use a custom USB 
 keyboard device driver instead of the default PS/2 keyboard driver.
 
-The kernel is inspired by Unix, where almost everything is a file. The device driver interface is, 
+The Kernel is inspired by Unix, where almost everything is a file. The device driver interface is, 
 consequently, based on functions such as open, read, write, and close.
 
 
 \section{API Functions}
 
-The kernel's internal code and data structures are subject to change. 
+The Kernel's internal code and data structures are subject to change. 
 Only the functions listed in this section are part of the stable interface.
 
 \begin{longtblr}{colspec = {X[5,l] X[3,l] X[8,l] },
@@ -34,13 +34,12 @@ rowhead = 1,
 rowfoot = 0}
 Name & Address & Description \\
 \hline
-reset               & \$c000    & System reset \\
-alloc               & \$c003    & Allocates one RAM bank (8 kB) \\
-free                & \$c006    & Frees one RAM bank \\          
-device\_register    & \$c009    & Registers a new device driver \\
-device\_unregister  & \$c00c    & Unregisters a device \\          
-file\_open          & \$c00f    & Opens a file \\
-file\_dup           & \$c012    & Duplicates a file table entry \\
+reset               & \$c003    & System reset \\
+alloc               & \$c006    & Allocates one RAM bank (8 kB) \\
+free                & \$c009    & Frees one RAM bank \\          
+device\_register    & \$c00c    & Registers a new device driver \\
+device\_unregister  & \$c00f    & Unregisters a device \\          
+file\_open          & \$c012    & Opens a file \\
 file\_read\_byte    & \$c015    & Reads one byte from a file \\
 file\_read\_block   & \$c018    & Reads a block of bytes from a file \\
 file\_write\_byte   & \$c01b    & Writes one byte to a file \\
@@ -49,19 +48,21 @@ file\_seek          & \$c021    & Seeks a position in a file \\
 file\_position      & \$c024    & Returns current position in a file \\
 file\_close         & \$c027    & Closes a file \\
 file\_ioctl         & \$c02a    & Driver-specific control commands \\
-stdin\_read         & \$c02d    & Reads one byte from stdin \\     
-stdout\_write       & \$c030    & Writes one byte to stdout \\              
-get\_ticks          & \$c033    & Returns the jiffy clock \\              
-set\_ticks          & \$c036    & Sets the jiffy clock \\                
-get\_errmsg         & \$c039    & Returns system error message \\
-set\_errmsg         & \$c03c    & Sets system error message \\
-sys\_info           & \$c03f    & Get system info \\
+std\_set            & \$c02d    & Set standard stream \\
+std\_get            & \$c030    & Get standard stream \\
+stdin\_read         & \$c033    & Reads one byte from STDIN \\     
+stdout\_write       & \$c036    & Writes one byte to STDOUT \\
+get\_ticks          & \$c039    & Returns the jiffy clock \\              
+set\_ticks          & \$c03c    & Sets the jiffy clock \\                
+get\_errmsg         & \$c03f    & Returns system error message \\
+set\_errmsg         & \$c042    & Sets system error message \\
+sys\_info           & \$c045    & Get system info \\
 \end{longtblr}
 
 
 \section{Passing and Returning Values}
 
-Values are passed to the kernel functions and returned through 
+Values are passed to the Kernel functions and returned through 
 the A, X, Y registers, and 14 zero page registers 
 named r0-13 (address \$02-\$0f).
 
@@ -71,7 +72,7 @@ first (little-endian).
 
 \section{Error Handling}
 
-All kernel functions must indicate an error
+All Kernel functions must indicate an error
 condition by setting the carry flag on return.
 
 An error code is always returned in the A register. The A register
@@ -108,18 +109,18 @@ Code & Name & Description \\
 
 \section{Device Table}
 
-The kernel uses a device table to keep track of device drivers. The device table has room for 16 devices, 
+The Kernel uses a device table to keep track of active device drivers. The device table has room for 16 drivers, 
 and contains the following fields:
 
 \begin{longtblr}{colspec = {X[3,l] X[2,l] X[11,l] },
 width = \linewidth,
 rowhead = 1,
 rowfoot = 0}
-Field & Values & Description \\
+Field & Bit size & Description \\
 \hline
-addr        & 0-65535 & Device driver address \\
-bank        & 0-255 & Device driver bank \\
-flags       & 0-255 & See list of flags below \\
+addr        & 16 & Device driver address \\
+bank        & 8 & Device driver bank \\
+flags       & 8 & See list of flags below \\
 \end{longtblr}
 
 The flags stored in the device table are:
@@ -132,7 +133,7 @@ The flags stored in the device table are:
     \item Bit 4: Set if a block device, unset if a char device.
     \item Bits 5-6: Driver location, where 00 = Not present, 01 = ROM bank 0 or low RAM,
     10 = ROM bank 1-255, 11 = RAM bank 0-255.
-    \item Bit 7: Set if kernel is requested to call the driver's on\_irq function on every IRQ.
+    \item Bit 7: Set if Kernel is requested to call the driver's on\_irq function on every IRQ.
 \end{itemize}
 
 A device driver is added to the device table when you call the device\_register function. The
@@ -142,7 +143,7 @@ safe to manipulate the device table directly.
 
 \section{File Table}
 
-The kernel has a file table to keep track of all opened files. There is room for 16 files in
+The Kernel has a file table to keep track of all opened files. There is room for 16 files in
 the file table. The table holds the following information:
 
 \begin{longtblr}{colspec = {X[3,l] X[2,l] X[10,l] },
@@ -170,22 +171,29 @@ The flags in the file table are:
 A file is added to the file table when you call the file\_open function, and it is removed when
 you call the file\_close function. It is not recommended or safe to manipulate the file table directly.
 
-Some file handles have a fixed meaning to the system:
+
+\section{Standard Streams}
+
+The Kernel has four standard streams that may be connected to open files using the std\_set function:
 
 \begin{itemize}
-    \item 0: STDIN.
-    \item 1: STDOUT.
-    \item 2: Keyboard.
-    \item 3: Mouse.
-    \item 4: SNES game controllers.
+    \item STDIN (handle \$80)
+    \item STDOUT (handle \$81)
+    \item STDMOUSE (handle \$82)
+    \item STDGAME (handle \$83)
 \end{itemize}
+
+The standard streams may be used as input to Kernel functions instead of a handle for an open file.
+The API specification details which Kernel functions work with standard streams.
+
+The file currently connected to a standard stream can be retrieved with the std\_get function.
 
 
 \section{API Function Specifications}
 
 \subsection{Function: reset}
 
-\textbf{Call address:} \$c000 \\
+\textbf{Call address:} \$c003 \\
 \textbf{Input:} None \\
 \textbf{Output:} None \\
 \textbf{Errors:} None
@@ -208,17 +216,18 @@ The function frees all banked RAM and initializes the core device drivers:
 
 \subsection{Function: alloc}
 
-\textbf{Call address:} \$c003 \\
+\textbf{Call address:} \$c006 \\
 \textbf{Input:} A = RAM bank \\
 \textbf{Output:} A = RAM bank \\
+\textbf{Registers affected:} TBD... \\
 \textbf{Errors:} ENOMEM, EMEMINUSE
 
-The X16 has no hardware memory management. The kernel's memory management functions 
+The X16 has no hardware memory management. The Kernel's memory management functions 
 (alloc and free) keep track of which part of banked RAM is free to use. All well-behaved
 applications should use these functions. They may otherwise overwrite custom
 device drivers loaded into banked RAM.
 
-RAM bank 0 is used by the kernel and can't be allocated for other purposes.
+RAM bank 0 is used by the Kernel and can't be allocated for other purposes.
 
 If this function is called with A = 0, it will search for and allocate the next available
 RAM bank. Error ENOMEM is set if there is no free memory.
@@ -231,9 +240,10 @@ A successfully allocated RAM bank is returned in the A register.
 
 \subsection{Function: free}
 
-\textbf{Call address:} \$c006 \\
+\textbf{Call address:} \$c009 \\
 \textbf{Input:} A = RAM bank \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} TBD... \\
 \textbf{Errors:} EINVAL
 
 This function frees a RAM bank that was allocated with the alloc function.
@@ -244,22 +254,23 @@ called with A = 0, the EINVAL error is returned.
 
 \subsection{Function: device\_register}
 
-\textbf{Call address:} \$c009 \\
+\textbf{Call address:} \$c00c \\
 \textbf{Input:} X = Device ID, r0-1 = Driver address, r2 = Driver bank \\
 \textbf{Output:} X = Device ID \\
+\textbf{Registers affected:} A, X, Y, P \\
 \textbf{Errors:} ENODEVSPC, EDEVBUSY, EIO
 
 The function registers a device driver that is already present in memory.
 
 The system's base drivers needed to boot the system are embedded into
-the kernel ROM bank, and are automatically registered and initialized by
+the Kernel ROM bank, and are automatically registered and initialized by
 the reset function.
 
 If called with X = 255, the first free device ID will be used. Otherwise, the function 
 attempts to use the specified device ID.
 
 The driver's on\_register function is automatically invoked when calling this function. 
-The kernel's device table is updated with information on the new driver, 
+The Kernel's device table is updated with information on the new driver, 
 including flags returned by the on\_register function.
 
 The ENODEVSPC error is returned if the driver table is full.
@@ -272,12 +283,17 @@ EIO is a driver-specific error.
 
 \subsection{Function: device\_unregister}
 
-\textbf{Call address:} \$c00c \\
+\textbf{Call address:} \$c00f \\
 \textbf{Input:} X = Device ID \\
 \textbf{Output:} None \\
-\textbf{Errors:} EDEVBUSY, EIO
+\textbf{Registers affected:} A, Y, P \\
+\textbf{Errors:} EINVAL, ENODEV, EDEVBUSY, EIO
 
 Unregisters the specified device driver.
+
+EINVAL is returned if the device ID is not valid.
+
+ENODEV is returned if the specified driver is not present.
 
 The EDEVBUSY error is returned if the device driver is linked to an open file.
 
@@ -286,20 +302,21 @@ EIO is a driver-specific error.
 
 \subsection{Function: file\_open}
 
-\textbf{Call address:} \$c00f\\
+\textbf{Call address:} \$c012\\
 \textbf{Input:} X = File handle, Y = Device ID, A = Flags, r0-1 = Path address, r2 = Path bank \\
 \textbf{Output:} X = File handle, Y = Context ID, A = Flags \\
+\textbf{Registers affected:} A, X, Y, P \\
 \textbf{Errors:} ENODEV, ENOFILESPC, EFILEOPEN, ENOTFILE, ENOTFOUND, EINVAL, EIO
 
 Opens a file using the specified device driver.
 
 If the X register is set to \$ff, the new file is linked to the next available file handle. 
-Otherwise, the function attempts to use the specified file handle.
+Otherwise, the function attempts to use the specified file handle. The file handle may not be
+a standard stream.
 
 The file is opened using the device driver specified in the Y register.
 
-You must set exactly one of these flags when calling the function. The kernel doesn't support opening a file
-in multiple modes (or no mode).
+The following flags may be selected when opening a file:
 
 \begin{itemize}   
     \item Bit 0: Set if opened for reading.
@@ -313,7 +330,7 @@ If successfully opened, the file is entered into the file table. The file
 handle is returned in the X register and the driver's file context ID is
 returned in the Y register. The context is managed by the driver, and is used 
 by the driver to keep track of multiple files that are opened at the same time.
-The file flags are returned in the A register. In addition to the flag set
+The file flags are returned in the A register. In addition to the flags set
 as input to this function, bit 3 is set if a file and unset if a directory, and
 bit 7 is set if the file was successfully opened.
 
@@ -329,33 +346,18 @@ ENOTFILE is returned if attempting to write or append to a directory.
 
 The function fails with ENOTFOUND if the file is not found.
 
-The EINVAL error is returned if the device driver doesn't have the capability
-requested in the flags argument. The same error is returned if not exactly one flag is set.
+The EINVAL error is returned if the device driver doesn't have the capabilities
+requested in the flags argument.
 
 EIO is a driver-specific error.
-
-
-\subsection{Function: file\_dup}
-
-\textbf{Call address:} \$c012\\
-\textbf{Input:} X = Source file handle, Y = Destination file handle\\
-\textbf{Output:} Y = Destination file handle\\
-\textbf{Errors:} ENOFILESPC, ENOTOPEN, EFILEOPEN, EINVAL, EIO
-
-This function duplicates the file handle X as file
-handle Y without opening a new file.
-
-The function calls the driver's dup function. If necessary, the driver keeps track 
-of the number of references to a specific file context.
-A file that has been duplicated will typically not be closed by the
-driver until all references have been closed.
 
 
 \subsection{Function: file\_read\_byte}
 
 \textbf{Call address:} \$c015\\
-\textbf{Input:} X = File handle \\
+\textbf{Input:} X = File handle or standard stream \\
 \textbf{Output:} A = Value \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
 
 Reads one byte from the specified file.
@@ -374,8 +376,9 @@ EIO is a driver-specific error.
 \subsection{Function: file\_read\_block}
 
 \textbf{Call address:} \$c018\\
-\textbf{Input:} X = File handle, r0-1 = Requested number of bytes, r2-3 = Buffer address, r4 = Buffer bank \\
+\textbf{Input:} X = File handle or standard stream, r0-1 = Requested number of bytes, r2-3 = Buffer address, r4 = Buffer bank \\
 \textbf{Output:} r5-6 = Number of bytes read \\
+\textbf{Registers affected:} A, P, r0-1, r5-6 \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
 
 Reads a block from the specified file, at most the requested number of bytes. It is not guaranteed that
@@ -395,8 +398,9 @@ EIO is a driver-specific error.
 \subsection{Function: file\_write\_byte}
 
 \textbf{Call address:} \$c01b\\
-\textbf{Input:} X = File handle, A = Byte value \\
+\textbf{Input:} X = File handle or standard stream, A = Byte value \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} ENOTOPEN, ENOTFILE, EINVAL, EIO
 
 Writes one byte to the specified file.
@@ -414,8 +418,9 @@ EIO is a driver-specific error.
 \subsection{Function: file\_write\_block}
 
 \textbf{Call address:} \$c01e\\
-\textbf{Input:} X = File handle, r0-1 = Buffer size, r2-3 = Buffer address, r4 = Buffer bank \\
+\textbf{Input:} X = File handle or standard stream, r0-1 = Buffer size, r2-3 = Buffer address, r4 = Buffer bank \\
 \textbf{Output:} r5-6 = Number of bytes written \\
+\textbf{Registers affected:} A, P, r5-6 \\
 \textbf{Errors:} ENOTOPEN, ENOTFILE, EINVAL, EIO
 
 Writes one block to the specified file, at most the entire buffer size passed in r0-1.
@@ -433,18 +438,14 @@ EIO is a driver-specific error.
 \subsection{Function: file\_seek}
 
 \textbf{Call address:} \$c021\\
-\textbf{Input:} X = File handle, r0-3 = File position \\
+\textbf{Input:} X = File handle or standard stream, r0-3 = File position \\
 \textbf{Output:} r0-3 = File position \\
+\textbf{Registers affected:} A, P, r0-3 \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EIO
 
 Moves the file pointer to the requested position.
 
 The file position after this call is returned in r0-3.
-
-The kernel only allows writing to files in a sequential order at the end of the file, 
-and seeking is thus allowed only on files opened for reading. Attempting to 
-seek on a file opened for writing or appending returns 
-the EINVAL error.
 
 EINVAL is also returned if the device driver doesn't support
 seeking.
@@ -457,8 +458,9 @@ EIO is a driver-specific error.
 \subsection{Function: file\_position}
 
 \textbf{Call address:} \$c024\\
-\textbf{Input:} X = File handle \\
+\textbf{Input:} X = File handle or standard stream \\
 \textbf{Output:} r0-3 = File position \\
+\textbf{Registers affected:} A, P, r0-3 \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EIO
 
 Returns the current position in the specified file in r0-3.
@@ -474,8 +476,9 @@ EIO is a driver-specific error.
 \subsection{Function: file\_close}
 
 \textbf{Call address:} \$c027\\
-\textbf{Input:} X = File handle \\
+\textbf{Input:} X = File handle or standard stream \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} EINVAL, ENOTOPEN, EIO
 
 Closes the specified file and removes it from the file table.
@@ -488,9 +491,10 @@ EIO is a driver-specific error.
 \subsection{Function: file\_ioctl}
 
 \textbf{Call address:} \$c02a\\
-\textbf{Input:} X = File handle, A = Device type, r0 = Command, r1 = Input length, r2-3 = Input data or input buffer address, r4 = Input buffer bank,
-r5 = Output max length, r6-7 = Output buffer address, r8 = Output buffer bank \\
+\textbf{Input:} X = File handle or standard stream, r0 = Device type, r1 = Command, r2 = Input length, r3-4 = Input data or input buffer address, r5 = Input buffer bank,
+r6-7 = Output buffer address, r8 = Output buffer bank, r9 = Output buffer max length \\
 \textbf{Output:} A = Output length \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EIO
 
 This function executes a device-specific control command.
@@ -502,15 +506,13 @@ ENOTOPEN is returned if the file is not open.
 The type of device that the command is meant for is specified in the A register. EINVAL 
 is returned if the driver doesn't support commands for the specified device type.
 
-The control command is specified in r0. The two most significant bits are used to flag if the input 
-(r2-4) and output (r6-8) are direct values (max two bytes) or buffer pointers:
+The control command is specified in r1. The two most significant bits are used to flag if the input 
+(r3-4) and output (r6-7) are direct values (max two bytes) or buffer pointers:
 
 \begin{itemize}
     \item Bit 7: Set if output is a direct value, clear if output is a buffer pointer.
     \item Bit 6: Set if input is a direct value, clear if input is a buffer pointer.
 \end{itemize}
-
-The input is specified in r0-4, and the output is specified in r5-8.
 
 The function returns the output length in the A register. If the output is a direct value, it is returned
 in r6-7. Otherwise, the output buffer pointer and bank are returned in r6-8.
@@ -518,11 +520,40 @@ in r6-7. Otherwise, the output buffer pointer and bank are returned in r6-8.
 EIO is a driver-specific error.
 
 
-\subsection{Function: stdin\_read}
+\subsection{Function: std\_set}
 
 \textbf{Call address:} \$c02d\\
+\textbf{Input:} X = File handle, Y = Standard stream \\
+\textbf{Output:} None \\
+\textbf{Registers affected:} A, P \\
+\textbf{Errors:} ENOTOPEN, EINVAL
+
+Connects an open file to a standard stream.
+
+ENOTOPEN is returned if the file referenced by X is not open.
+
+EINVAL is returned if the standard stream is not valid.
+
+
+\subsection{Function: std\_get}
+
+\textbf{Call address:} \$c030\\
+\textbf{Input:} Y = Standard stream \\
+\textbf{Output:} A = File handle \\
+\textbf{Registers affected:} X, P \\
+\textbf{Errors:} EINVAL
+
+Returns file handle connected to a standard stream.
+
+EINVAL is returned if the standard stream is not valid.
+
+
+\subsection{Function: stdin\_read}
+
+\textbf{Call address:} \$c033\\
 \textbf{Input:} None \\
 \textbf{Output:} A = Byte value \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EEOF, EIO
 
 Reads one byte from STDIN, i.e. file handle 0.
@@ -542,9 +573,10 @@ EIO is a driver-specific error.
 
 \subsection{Function: stdout\_write}
 
-\textbf{Call address:} \$c030\\
+\textbf{Call address:} \$c036\\
 \textbf{Input:} A = Byte value \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} A, P \\
 \textbf{Errors:} ENOTOPEN, EINVAL, EIO
 
 Writes one byte to STDOUT, i.e. file handle 1.
@@ -558,9 +590,10 @@ EIO is a driver-specific error.
 
 \subsection{Function: get\_ticks}
 
-\textbf{Call address:} \$c033\\
+\textbf{Call address:} \$c039 \\
 \textbf{Input:} None \\
-\textbf{Output:} r0-r3 = Counter value \\
+\textbf{Output:} A = Counter low, X = Counter mid, Y = Counter high \\
+\textbf{Registers affected:} A, X, Y, P \\
 \textbf{Errors:} None
 
 Returns the jiffy clock tick counter that is
@@ -569,9 +602,10 @@ incremented on every IRQ (60 times per second).
 
 \subsection{Function: set\_ticks}
 
-\textbf{Call address:} \$c036\\
-\textbf{Input:} r0-r3 = Counter value \\
+\textbf{Call address:} \$c03c\\
+\textbf{Input:} A = Counter low, X = Counter mid, Y = Counter high \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} None \\
 \textbf{Errors:} None
 
 Sets the jiffy clock tick counter that is
@@ -580,9 +614,10 @@ incremented on every IRQ (60 times per second).
 
 \subsection{Function: get\_errmsg}
 
-\textbf{Call address:} \$c039\\
+\textbf{Call address:} \$c03f\\
 \textbf{Input:} None \\
 \textbf{Output:} A = Error number, r0-1 = Error message address, r2 = Error message bank \\
+\textbf{Registers affected:} A, r0-2 \\
 \textbf{Errors:} None
 
 Returns the last error number in the A register and a pointer to
@@ -591,9 +626,10 @@ the last error message, that is always a null-terminated string.
 
 \subsection{Function: set\_errmsg}
 
-\textbf{Call address:} \$c03c\\
+\textbf{Call address:} \$c042\\
 \textbf{Input:} A = Error number, r0-1 = Error message address, r2 = Error message bank \\
 \textbf{Output:} None \\
+\textbf{Registers affected:} None \\
 \textbf{Errors:} None
 
 Sets the error number and message that can be retrieved with the
@@ -602,9 +638,10 @@ get\_errmsg function.
 
 \subsection{Function: sys\_info}
 
-\textbf{Call address:} \$c03f\\
+\textbf{Call address:} \$c045\\
 \textbf{Input:} None \\
-\textbf{Output:} r0-3 = Kernel version (r0 major, r1 minor, r2 patch), r4-5 = String address, r6 = String bank \\
+\textbf{Output:} r0-2 = Kernel version (r0 major, r1 minor, r2 patch), r3-4 = String address in ROM bank 0 \\
+\textbf{Registers affected:}  None \\
 \textbf{Errors:} None
 
-Returns the kernel version, and a plain null-terminated text description of the system.
+Returns the Kernel version, and a plain null-terminated text description of the system.

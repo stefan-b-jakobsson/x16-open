@@ -27,16 +27,22 @@
 .include "io.inc"
 .include "regs.inc"
 
+; Exports
 .export on_reset
 
+; Imports
 .import device_init, device_call
+.import file_init
 .import irq_init
+.import i2c_restore
+.import set_ticks
+.import shell_main
 
 .CODE
 
 ; *****************************************************************************
-; Purpose...............: System reset function called by the vector at
-;                         address $fffc
+; Purpose...............: Target for hardware reset vector ($fffc); may also be
+;                         called in runtime code to reset the system.
 ; Input.................: None
 ; Output................: None
 ; Preparatory rutines...: None
@@ -47,32 +53,28 @@
     ; Disable interrupts
     sei
 
-    ; Set ROM bank
+    ; Ensure ROM bank register is 0
     stz rom_bank
 
-    ; Initialize core device drivers
+    ; Initialize I2C library
+    jsr i2c_restore
+
+    ; Initialize device drivers
     jsr device_init
+
+    ; Initialize files
+    jsr file_init
 
     ; Initialize interrupts
     jsr irq_init
-    
-    ; Print hello
+
+    ; Reset jiffy clock
+    lda #0
     ldx #0
-:   phx
-    lda hello,x
-    beq exit
-    sta r0
-    ldx #0 ; Vera
-    ldy #12 ; Write
-    jsr device_call
-    plx
-    inx
-    bne :-
+    ldy #0
+    jsr set_ticks
 
-exit:
+    ; Reset complete
     cli
-:   bra :-
-
-hello:
-    .byt "X16 OPEN KERNEL V. 0.0.1",13,0
+    jmp shell_main
 .endproc

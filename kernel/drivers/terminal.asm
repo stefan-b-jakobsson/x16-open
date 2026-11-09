@@ -28,7 +28,7 @@
 
 .export terminal_dispatch
 
-.import petscii
+.import petscii, device_call
 
 .include "io.inc"
 
@@ -59,8 +59,7 @@ VERA_SCREEN_ADDR = screen_addr
 jmp_table:
     .word on_register               ; ID 0, on_register
     .word not_implemented           ; ID 2, on_unregister
-    .word not_implemented           ; ID 4, open
-    .word not_implemented           ; ID 6, dup
+    .word open                      ; ID 4, open
     .word not_implemented           ; ID 8, read_byte
     .word not_implemented           ; ID 10, read_block
     .word write_byte                ; ID 12, write_byte
@@ -85,10 +84,6 @@ jmp_table:
     ; Cursor position to top left
     stz terminal_x
     stz terminal_y
-
-    ; Activate cursor
-    lda #1
-    sta cursor_state
 
     ; Reset VERA + DCSEL=0 + ADDRSEL=0
     lda #$80
@@ -151,7 +146,19 @@ jmp_table:
     cmp #$b0+60
     bcc :-
 
+    ; Cursor show
+    lda #1
+    sta cursor_state
+
     ; Exit function
+    clc
+    lda #%10000010
+    rts
+.endproc
+
+.proc open
+    ldy #0
+    lda #%10001010
     clc
     rts
 .endproc
@@ -165,19 +172,11 @@ jmp_table:
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
 .proc write_byte
-    ; Get byte value
-    ldx r0
+    lda cursor_state
+    pha
 
-    ; Check if CR
-    cpx #13
-    bne :+
-    stz terminal_x
-    inc terminal_y
-    clc
-    rts
-    
-    ; Setup VERA address based on cursor position
-:   lda terminal_x
+    ; Setup VERA address to cursor position
+    lda terminal_x
     asl
     sta VERA_ADDR_L
     clc
@@ -187,8 +186,18 @@ jmp_table:
     lda #1
     sta VERA_ADDR_H
 
-    ; Convert PETSCII to screen code
+    ; Get byte value
     lda r0
+
+    ; Check if CR
+    cmp #13
+    bne convert
+    stz terminal_x
+    inc terminal_y
+    bra exit
+
+    ; Convert PETSCII to screen code
+convert:
     clc
 
     cmp #$20
@@ -228,16 +237,29 @@ print:
     inc terminal_x
     lda terminal_x
     cmp #80
-    bcc :+
+    bcc exit
     stz terminal_x
     inc terminal_y
 
-:   ; Exit function
+exit:
+    ; Hide cursor
+    inc VERA_ADDR_L
+    lda #97
+    sta VERA_DATA0
+
+    ; Enable cursor again
+    pla
+    beq exit2
+    lda #1
+    sta cursor_state
+
+exit2:
     clc
     rts
 .endproc
 
 .proc on_irq
+    ; Update cursor
     lda cursor_state
     bne :+
 
@@ -246,36 +268,29 @@ exit:
     rts
 
 :   dec cursor_state
-    beq show
+    bne :+
+    ldx #60
+    stx cursor_state
+    bra set_state
 
-    lda cursor_state
+:   lda cursor_state
     cmp #30
     bne exit
-
-hide:
     ldx #97
-    bra update
 
-show:
-    lda #60
-    sta cursor_state
-    ldx #22
-
-update:
+set_state:
     lda terminal_x
     asl
     inc
     sta VERA_ADDR_L
-
     clc
     lda terminal_y
     adc #$b0
     sta VERA_ADDR_M
     lda #1
     sta VERA_ADDR_H
+    lda #60
     stx VERA_DATA0
-    
-    clc
     rts
 .endproc
 
