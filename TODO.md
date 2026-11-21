@@ -5,7 +5,7 @@
 |kernel/sys                     |Kernel base functionality |Stefan                 | 75%          |
 |kernel/drivers/ps2kbd.asm      |PS/2 keyboard driver      |Stefan                 | 75%          |
 |kernel/drivers/terminal.asm    |Terminal/screen driver    |                       | 1%           |
-|kernel/font                    |Make a system font        |Stefan                 | 50%          |
+|font/                          |Make a system font        |Stefan                 | 50%          |
 |shell/                         |Minimal unix like shell   |                       | 1%           |
 |kernel/drivers/sdcard.asm      |SD card driver            |                       | 0%           |
 |kernel/drivers/snes.asm        |SNES controller driver    |                       | 0%           |
