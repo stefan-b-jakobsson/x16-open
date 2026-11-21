@@ -3,9 +3,9 @@
 | Location                      | Description              | Who's working on it?  | Completion % |
 |-------------------------------|--------------------------|-----------------------|--------------|
 |kernel/sys                     |Kernel base functionality |Stefan                 | 75%          |
-|kernel/drivers/ps2kbd.asm      |PS/2 keyboard driver      |                       | 10%          |
+|kernel/drivers/ps2kbd.asm      |PS/2 keyboard driver      |Stefan                 | 75%          |
 |kernel/drivers/terminal.asm    |Terminal/screen driver    |                       | 1%           |
-|kernel/font                    |Make a system font        |                       | 5%           |
+|kernel/font                    |Make a system font        |Stefan                 | 50%          |
 |shell/                         |Minimal unix like shell   |                       | 1%           |
 |kernel/drivers/sdcard.asm      |SD card driver            |                       | 0%           |
 |kernel/drivers/snes.asm        |SNES controller driver    |                       | 0%           |
@@ -23,6 +23,7 @@
 - Why not VT100 encoding? It is just too much overhead for the 65C02 CPU. There is a risk that the system
 would become sluggish if all input/output had to go through a VT100 parser. Support for VT100, or a subset thereof,
 could be implemented in a serial or network driver.
+- Most of the base functions of this driver has been implemented.
 
 ## Terminal
 
@@ -38,8 +39,10 @@ of all characters.
 ## Font
 
 We should avoid copying the Commodore font, even though in 
-many countries you can't claim copyright to bitmap fonts. There is a simple
-python tool in the project that can be used to draw characters.
+many countries you can't claim copyright to bitmap fonts.
+
+A font designed by AI is included in the project. It has been touched up
+manually, but further improvements are welcome.
 
 ## Shell
 
