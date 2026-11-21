@@ -27,7 +27,7 @@
 .include "io.inc"
 
 ; Exports
-.export irq_init, on_irq_request, irq_default_handler, irq_exit
+.export irq_init, on_irq_request, irq_default_handler, irq_exit, irq_vector
 
 ; Imports
 .import __K_IRQ_LOAD__, __K_IRQ_RUN__, __K_IRQ_SIZE__

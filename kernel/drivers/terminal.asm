@@ -24,19 +24,22 @@
 ; POSSIBILITY OF SUCH DAMAGE.
 ; *****************************************************************************
 
+; Includes
 .include "regs.inc"
-
-.export terminal_dispatch
-
-.import petscii, device_call
-
 .include "io.inc"
 
+; Exports
+.export terminal_dispatch
+
+; Imports
+.import fetch
+.import font_latin9, device_call
+
+; Definitions
 VERA_CHARSET_ADDR = charset_addr
 VERA_SCREEN_ADDR = screen_addr
 
 .CODE
-
 ; *****************************************************************************
 ; Purpose...............: Terminal driver dispatch function
 ; Input.................: Y         Driver function ID
@@ -90,26 +93,28 @@ jmp_table:
     sta VERA_CTRL
 
     ; Upload charset
-    lda #<petscii
-    sta $22
-    lda #>petscii
-    sta $23
-
     stz VERA_ADDR_L
     lda #((VERA_CHARSET_ADDR>>8) & 255)
     sta VERA_ADDR_M
     lda #(((VERA_CHARSET_ADDR>>16) & 1) | %00010000)
     sta VERA_ADDR_H
 
+    lda #$00    ; Set font start address, $c000
+    sta r0
+    lda #$c0
+    sta r1
+
     ldy #0
-    ldx #8
-:   lda ($22),y
+:   lda #r0
+    ldx #2      ; Bank 2
+    jsr fetch
     sta VERA_DATA0
     iny
     bne :-
-    inc $23
-    dex
-    bne :-
+    inc r1
+    lda r1
+    cmp #$c8
+    bcc :-
     
     ; Layer 1 config
     lda #$60                            ; Map height 64 + Map width 128
@@ -191,44 +196,15 @@ jmp_table:
 
     ; Check if CR
     cmp #13
-    bne convert
+    bne :+
     stz terminal_x
     inc terminal_y
     bra exit
 
-    ; Convert PETSCII to screen code
-convert:
-    clc
-
-    cmp #$20
-    bcs :+
-    adc #$80
-    bra print
-
-:   cmp #$40
-    bcc print
-
-    cmp #$60
-    bcs :+
-    adc #$c0
-    bra print
-
-:   cmp #$80
-    bcs :+
-    adc #$e0
-    bra print
-
-:   cmp #$a0
-    bcs :+
-    adc #$c0
-    bra print
-
-:   cmp #$ff
-    beq :+
-    adc #$80
-    bra print
-
-:   lda #$5e
+:   ; Check F1
+    cmp #$85
+    bne print
+    lda #$40
 
 print:
     sta VERA_DATA0

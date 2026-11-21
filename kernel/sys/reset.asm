@@ -37,6 +37,8 @@
 .import i2c_restore
 .import set_ticks
 .import shell_main
+.import jsrfar_init, fetch_init, stash_init, stavec, stdout_write, fetch, stash
+.import jsrfar
 
 .CODE
 
@@ -55,6 +57,11 @@
 
     ; Ensure ROM bank register is 0
     stz rom_bank
+
+    ; Setup RAM utils
+    jsr jsrfar_init
+    jsr fetch_init
+    jsr stash_init
 
     ; Initialize I2C library
     jsr i2c_restore

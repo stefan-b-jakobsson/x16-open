@@ -20,8 +20,6 @@ KERNEL_SOURCES = \
 	kernel/drivers/i2c.asm \
 	kernel/drivers/ps2kbd.asm \
 	kernel/drivers/terminal.asm \
-	kernel/font/font.asm \
-	kernel/ramcode/jsrfar.asm \
 	kernel/shell/shell.asm \
 	kernel/sys/device.asm \
 	kernel/sys/irq.asm \
@@ -31,11 +29,25 @@ KERNEL_SOURCES = \
 	kernel/sys/reset.asm \
 	kernel/sys/vectors.asm \
 	kernel/sys/file.asm \
+	kernel/util/jsrfar.asm \
+	kernel/util/fetch.asm \
+	kernel/util/stash.asm \
+	kernel/util/lzsa.asm
+
+KEYMAP_SOURCES = \
+	keymap/keymap.asm
+
+FONT_SOURCES = \
+	font/latin9.asm
 
 BANK_BINS = \
 	$(BUILD_DIR)/kernel.bin \
+	$(BUILD_DIR)/keymap.bin \
+	$(BUILD_DIR)/font.bin
 
 KERNEL_OBJS = $(addprefix $(BUILD_DIR)/, $(KERNEL_SOURCES:.asm=.o))
+KEYMAP_OBJS  = $(addprefix $(BUILD_DIR)/, $(KEYMAP_SOURCES:.asm=.o))
+FONT_OBJS  = $(addprefix $(BUILD_DIR)/, $(FONT_SOURCES:.asm=.o))
 
 # Wrapper for findsymbols that escapes the output and guards against non-zero exit codes
 define findsymbols
@@ -67,8 +79,20 @@ $(BUILD_DIR)/%.o: %.s
 	@mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) $< -o $@ -l $(BUILD_DIR)/$(subst /,_,$@).lst
 
-# Make bank 0: ROM
+# Bank 0: ROM
 $(BUILD_DIR)/kernel.bin: $(KERNEL_OBJS) $(CONF_DIR)/kernel.cfg $(CONF_DIR)/ram.inc
 	@mkdir -p $$(dirname $@)
 	cc65 -E -o $(BUILD_DIR)/kernel.cfg $(CONF_DIR)/kernel.cfg
 	$(LD) -C $(BUILD_DIR)/kernel.cfg $(KERNEL_OBJS) -o $@ -Ln $(BUILD_DIR)/kernel.sym -m $(BUILD_DIR)/kernel.map
+
+# Bank 1: keymap
+$(BUILD_DIR)/keymap.bin: $(KEYMAP_OBJS) $(KEYMAP_DEPS) 
+	@mkdir -p $$(dirname $@)
+	cc65 -E -o $(BUILD_DIR)/keymap.cfg $(CONF_DIR)/keymap.cfg
+	$(LD) -C $(BUILD_DIR)/keymap.cfg $(KEYMAP_OBJS) -o $@ -m $(BUILD_DIR)/keymap.map -Ln $(BUILD_DIR)/keymap.sym
+
+# Bank 2: font
+$(BUILD_DIR)/font.bin: $(FONT_OBJS) $(FONT_DEPS) 
+	@mkdir -p $$(dirname $@)
+	cc65 -E -o $(BUILD_DIR)/font.cfg $(CONF_DIR)/font.cfg
+	$(LD) -C $(BUILD_DIR)/font.cfg $(FONT_OBJS) -o $@
