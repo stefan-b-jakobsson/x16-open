@@ -3,8 +3,7 @@
 .export jmpfr, jsrfar_init, jsrfar
 
 .import __K_JSRFAR_LOAD__, __K_JSRFAR_RUN__, __K_JSRFAR_SIZE__
-
-imparm = $80
+.importzp imparm
 
 .CODE
 
