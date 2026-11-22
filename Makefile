@@ -15,6 +15,7 @@ report := $(subst /,_,$(target))
 
 # Kernal resources
 KERNEL_SOURCES = \
+	kernel/sys/common.asm \
 	kernel/sys/signature.asm \
 	kernel/sys/jmptable.asm \
 	kernel/drivers/i2c.asm \

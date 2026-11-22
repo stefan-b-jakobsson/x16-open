@@ -28,6 +28,7 @@
 .include "io.inc"
 .include "keycode.inc"
 .include "keymap.inc"
+.include "banks.inc"
 
 ; Exports
 .export ps2kbd_dispatch
@@ -192,6 +193,8 @@ empty:
 ; Affected registers....: A, X, Y, P, r0, r1, r2, r3, r8, r9
 ; Credits...............: New implementation, not based on previous work
 .proc load_layout
+    KVARS_START
+
     ; Get layout start address
     ldy #14
     lda #r3
@@ -204,9 +207,6 @@ empty:
     jsr fetch
     sta r1
 
-    ; Select RAM bank 0
-    stz ram_bank
-
     ; Decompress to $00:a000
     stz r2
     lda #$a0
@@ -215,7 +215,10 @@ empty:
     sta r8
     lda #>fetch_kbd
     sta r9
-    jmp memory_decompress_internal
+    jsr memory_decompress_internal
+
+    KVARS_END
+    rts
 
 fetch_kbd:
 	php
@@ -249,10 +252,13 @@ fetch_kbd:
     ldx #$42 ; I2C address
     ldy #$07 ; SMC function ID
     jsr i2c_read_byte
-    bne update_modifier
+    bne select_ram_bank
 
 exit:
     rts
+
+select_ram_bank:
+    KVARS_START_TRASH_X_NZ
 
 update_modifier:
     ; Store key number on stack
@@ -278,17 +284,18 @@ update_modifier_match:
 update_modifier_key_down:
     ora modifier_state
     sta modifier_state
-    rts
+    jmp restore_ram_bank
 
 update_modifier_key_up:
     eor #$ff
     and modifier_state
     sta modifier_state
-    rts
+    jmp restore_ram_bank
 
 assert_keydown:
     ply ; Restore key number from stack
-    bmi exit
+    bpl toggle_capslock
+    jmp restore_ram_bank
 
 toggle_capslock:
     cpy #KEYCODE_CAPSLOCK ; Check if Caps Lock key number
@@ -296,7 +303,7 @@ toggle_capslock:
     lda modifier_state ; Yes, toggle Caps Lock state
     eor #MOD_CAPSLOCK ; Toggle bit
     sta modifier_state
-    rts
+    jmp restore_ram_bank
 
 assert_buffer_not_full:
     ; Calculate next ring buffer tail
@@ -306,9 +313,10 @@ assert_buffer_not_full:
     bcc :+
     lda #0 ; Wrap around to 0
 :   cmp buf_head ; Check if next tail is same as head = buffer full
-    beq exit
-    pha ; Store next tail on stack
-    
+    bne :+
+    jmp restore_ram_bank
+:   pha ; Store next tail on stack
+
 apply_capslock:
     ; Is Caps Lock active?
     lda modifier_state
@@ -372,7 +380,7 @@ lookup_char:
 exit2:
     ; Unsupported state, exit
     pla ; Restore stack
-    rts
+    bra restore_ram_bank
 
 regular:
     lda KEYMAP_REGTBL,y
@@ -454,6 +462,9 @@ put_char:
     sta buf,x ; Store in buffer
     plx ; Get new tail from stack
     stx buf_tail ; And store it
+
+restore_ram_bank:
+    KVARS_END
     rts
 .endproc
 
