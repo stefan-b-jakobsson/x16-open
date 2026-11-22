@@ -11,7 +11,7 @@
 ; Purpose...............: Initialize jsrfar function, copies RAM code
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, X, P
 ; Credits...............: New implementation
@@ -36,7 +36,7 @@
 ;							.byte 2
 ;							; Execution continues here after jsrfar
 ; Output................: Output is set by the function that was called
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: None, but the function called can affect registers 
 ; Credits...............: Based on implementation in X16-rom,

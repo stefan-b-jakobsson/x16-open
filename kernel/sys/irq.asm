@@ -44,7 +44,7 @@ irq_vector = $0314
 ;                         flag
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: Before calling this function, disable IRQs with the
+; Preparatory routines..: Before calling this function, disable IRQs with the
 ;                         CLI instruction
 ; Errors................: None
 ; Preserved registers...: None
@@ -76,7 +76,7 @@ irq_vector = $0314
 ; Purpose...............: Target for the hardware IRQ vector ($fffe)
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation
@@ -101,7 +101,7 @@ irq_vector = $0314
 ; Purpose...............: Default IRQ handler
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation
@@ -123,7 +123,7 @@ irq_vector = $0314
 ; Purpose...............: Default IRQ handler - RAM part
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work

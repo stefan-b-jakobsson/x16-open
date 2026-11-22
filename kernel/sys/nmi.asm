@@ -33,7 +33,7 @@
 ; Purpose...............: Target for hardware NMI vector ($fffa)
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation

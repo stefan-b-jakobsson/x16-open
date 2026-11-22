@@ -59,7 +59,7 @@ MOD_CAPSLOCK    = %10000000
 ; Purpose...............: PS/2 keyboard driver dispatch function
 ; Input.................: X = Driver function ID
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -91,7 +91,7 @@ jmp_table:
 ; Purpose...............: Called by Kernel on registering the device
 ; Input.................: None
 ; Output................: A     Device driver flags
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -127,7 +127,7 @@ jmp_table:
 ; Input.................: None
 ; Output................: A     Device driver flags
 ;                         Y     File context ID, always 0
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -143,7 +143,7 @@ jmp_table:
 ;                         function returns 0 if no data is available.
 ; Input.................: A     File context ID, ignored
 ; Output................: A     Byte value
-; Preparatory rutines...: open
+; Preparatory routines..: open
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -176,19 +176,22 @@ empty:
 ; Purpose...............: Called by the Kernel on IRQ
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: open
+; Preparatory routines..: open
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
 .proc on_irq
-    jmp scan_keyboard
+    KVARS_START_TRASH_A_NZ
+    jsr scan_keyboard
+    KVARS_END
+    rts
 .endproc
 
 ; *****************************************************************************
 ; Purpose...............: Loads a new keyboard layout from ROM bank 1
 ; Input.................: r3-4      Pointer to item in list at $01:c000-c1ff
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Affected registers....: A, X, Y, P, r0, r1, r2, r3, r8, r9
 ; Credits...............: New implementation, not based on previous work
@@ -243,7 +246,7 @@ fetch_kbd:
 ;                         keyboard ring buffer
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: Set RAM bank to 0
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -252,13 +255,10 @@ fetch_kbd:
     ldx #$42 ; I2C address
     ldy #$07 ; SMC function ID
     jsr i2c_read_byte
-    bne select_ram_bank
+    bne update_modifier
 
 exit:
     rts
-
-select_ram_bank:
-    KVARS_START_TRASH_X_NZ
 
 update_modifier:
     ; Store key number on stack
@@ -284,18 +284,18 @@ update_modifier_match:
 update_modifier_key_down:
     ora modifier_state
     sta modifier_state
-    jmp restore_ram_bank
+    rts
 
 update_modifier_key_up:
     eor #$ff
     and modifier_state
     sta modifier_state
-    jmp restore_ram_bank
+    rts
 
 assert_keydown:
     ply ; Restore key number from stack
     bpl toggle_capslock
-    jmp restore_ram_bank
+    rts
 
 toggle_capslock:
     cpy #KEYCODE_CAPSLOCK ; Check if Caps Lock key number
@@ -303,7 +303,7 @@ toggle_capslock:
     lda modifier_state ; Yes, toggle Caps Lock state
     eor #MOD_CAPSLOCK ; Toggle bit
     sta modifier_state
-    jmp restore_ram_bank
+    rts
 
 assert_buffer_not_full:
     ; Calculate next ring buffer tail
@@ -313,9 +313,8 @@ assert_buffer_not_full:
     bcc :+
     lda #0 ; Wrap around to 0
 :   cmp buf_head ; Check if next tail is same as head = buffer full
-    bne :+
-    jmp restore_ram_bank
-:   pha ; Store next tail on stack
+    beq exit
+    pha ; Store next tail on stack
 
 apply_capslock:
     ; Is Caps Lock active?
@@ -380,7 +379,7 @@ lookup_char:
 exit2:
     ; Unsupported state, exit
     pla ; Restore stack
-    bra restore_ram_bank
+    rts
 
 regular:
     lda KEYMAP_REGTBL,y
@@ -462,9 +461,6 @@ put_char:
     sta buf,x ; Store in buffer
     plx ; Get new tail from stack
     stx buf_tail ; And store it
-
-restore_ram_bank:
-    KVARS_END
     rts
 .endproc
 

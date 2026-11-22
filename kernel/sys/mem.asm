@@ -31,7 +31,7 @@
 ; Purpose...............: Allocates one RAM bank
 ; Input.................: A       RAM bank or $00 for next available
 ; Output................: A       RAM bank
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: C       Set on error
 ;                         A       Error code, ENOMEM, EMEMINUSE
 ; Registers affected....: ?
@@ -45,7 +45,7 @@
 ; Purpose...............: Frees one RAM bank
 ; Input.................: A       RAM bank
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: C       Set on error
 ;                         A       Error code, EINVAL
 ; Registers affected....: ?

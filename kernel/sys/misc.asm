@@ -43,7 +43,7 @@ jiffies: .res 3
 ; Output................: A     Counter value, bits 0-7
 ;                         X     Counter value, bits 8-15
 ;                         Y     Counter value, bits 16-23
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, X, Y, P
 ; Credits...............: New implementation
@@ -60,7 +60,7 @@ jiffies: .res 3
 ;                         X     Counter value, bits 8-15
 ;                         Y     Counter value, bits 16-23
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: None
 ; Credits...............: New implementation
@@ -75,7 +75,7 @@ jiffies: .res 3
 ; Purpose...............: Increments jiffy counter
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: P
 ; Credits...............: New implementation
@@ -96,7 +96,7 @@ exit:
 ; Output................: A         Error number
 ;                         r0-1      Error message address
 ;                         r2        Error message bank
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, r0-2
 ; Credits...............: New implementation
@@ -111,7 +111,7 @@ exit:
 ;                         r0-1      Error message address
 ;                         r2        Error message bank
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: None
 ; Credits...............: New implementation
@@ -125,7 +125,7 @@ exit:
 ; Input ................: None
 ; Output................: r0-2      Kernel version (major, minor, patch)
 ;                         r3-4      String buffer address in ROM bank 0
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: None
 ; Credits...............: New implementation

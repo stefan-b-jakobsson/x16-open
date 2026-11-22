@@ -47,7 +47,7 @@
 ;                         called in runtime code to reset the system.
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation

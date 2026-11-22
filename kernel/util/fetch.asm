@@ -10,7 +10,7 @@
 ; Purpose...............: Initialize fetch function, copies RAM code
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, X, P
 ; Credits...............: New implementation
@@ -30,7 +30,7 @@
 ;                         Y     Address offset
 ;                         X     RAM or ROM bank
 ; Output................: A		Value
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, X, P
 ; Credits...............: This code is based on the X16-rom stash function,

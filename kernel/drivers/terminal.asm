@@ -45,7 +45,7 @@ VERA_SCREEN_ADDR = screen_addr
 ; Input.................: Y         Driver function ID
 ;                         Further input as required by the driver function
 ; Output................: According to driver function documentation
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: C         Set on error
 ;                         A         Error code, according to driver function
 ;                                   documentation
@@ -79,7 +79,7 @@ jmp_table:
 ; Purpose...............: Clear screen and setup terminal driver
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -172,7 +172,7 @@ jmp_table:
 ; Purpose...............: Writes a byte to the screen
 ; Input.................: r0        Byte value
 ; Output................: None
-; Preparatory rutines...: open
+; Preparatory routines..: open
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -274,7 +274,7 @@ set_state:
 ; Purpose...............: Functions not (yet) implemented are pointed here
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: open
+; Preparatory routines..: open
 ; Errors................: None
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
@@ -290,7 +290,7 @@ set_state:
 ; Output................: .A = Screen mode
 ;                         .X = Tile width
 ;                         .Y = Tile height
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: .C = 1 if requesting to set unsupported mode
 ; Registers affected....: .A, .X, .Y
 ; Credits...............: New implementation, not based on previous work

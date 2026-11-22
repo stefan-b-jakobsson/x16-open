@@ -14,7 +14,7 @@
 ; Purpose...............: Initialize stash function, copies RAM code
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: A, X, P
 ; Credits...............: New implementation
@@ -31,7 +31,7 @@
 ; Purpose...............: Set stash zero page vector
 ; Input.................: A     Stash vector in zero-page
 ; Output................: None
-; Preparatory rutines...: None
+; Preparatory routines..: None
 ; Errors................: None
 ; Registers affected....: None
 ; Credits...............: New implementation
@@ -49,7 +49,7 @@
 ;                         Y     Address offset
 ;                         X     RAM or ROM bank
 ; Output................: None
-; Preparatory rutines...: set_stavec
+; Preparatory routines..: set_stavec
 ; Errors................: None
 ; Registers affected....: X, P
 ; Credits...............: This code is based on the X16-rom stash function,

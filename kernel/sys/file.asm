@@ -56,7 +56,7 @@ std_streams:    .res STD_COUNT
 ; Purpose...............: Initializes the kernel's file table and functions
 ; Input.................: None
 ; Output................: None
-; Preparatory rutines...: device_init
+; Preparatory routines..: device_init
 ; Errors................: C         Set on error
 ;                         A         Error code, ENODEV, ENOFILESPC, EFILEOPEN, 
 ;                                   ENOTFILE, ENOTFOUND, EINVAL, EIO
@@ -121,7 +121,7 @@ err:
 ; Output................: X         File handle
 ;                         Y         Context ID
 ;                         A         Flags
-; Preparatory rutines...: device_register
+; Preparatory routines..: device_register
 ; Errors................: C         Set on error
 ;                         A         Error code, ENODEV, ENOFILESPC, EFILEOPEN, 
 ;                                   ENOTFILE, ENOTFOUND, EINVAL, EIO
@@ -202,7 +202,7 @@ err:
 ;                         error
 ; Input.................: X     File handle or standard stream
 ; Output................: X     Input preserved
-; Preparatory rutines...: Call file_open to open a file
+; Preparatory routines..: Call file_open to open a file
 ; Errors................: C     set on error
 ;                         A     error code, EINVAL, ENOTOPEN, EIO
 ; Registers affected....: A, P
@@ -276,7 +276,7 @@ err:
 ; Output................: A     Byte value
 ;                         X     Preserved
 ;                         Y     Preserved
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C     Set on error
 ;                         A     Error code, ENOTOPEN, EINVAL, EEOF, EIO
 ; Registers affected....: A, P
@@ -349,7 +349,7 @@ err:
 ;                         r2-3      Buffer address
 ;                         r4        Buffer bank
 ; Output................: r5-6      Number of bytes read
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EEOF, EIO
 ; Registers affected....: A, P, r0-1, r5-6
@@ -420,7 +420,7 @@ err:
 ; Input.................: X     File handle or standard stream
 ;                         A     Byte value
 ; Output................: None
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C     Set on error
 ;                         A     Error code, ENOTOPEN, ENOTFILE, EINVAL, EIO
 ; Registers affected....: A, P
@@ -501,7 +501,7 @@ err:
 ;                         r2-3      Buffer address
 ;                         r4        Buffer bank
 ; Output................: r5-6      Number of bytes written
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, ENOTFILE, EINVAL, EIO
 ; Affected registers....: A, P, r5-6
@@ -571,7 +571,7 @@ err:
 ; Input.................: X         File handle
 ;                         Y         Standard stream
 ; Output................: None
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL
 ; Registers affected....: A, P
@@ -611,7 +611,7 @@ err:
 ; Purpose...............: Returns file connected to a standard stream
 ; Input.................: Y         Standard stream
 ; Output................: X         File handle
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, EINVAL
 ; Registers affected....: A, P
@@ -636,7 +636,7 @@ err_invalid:
 ; Purpose...............: Reads a byte from STDIN
 ; Input.................: None
 ; Output................: A         Byte value
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EEOF, EIO
 ; Registers affected....: A, P
@@ -658,7 +658,7 @@ err_invalid:
 ; Purpose...............: Writes a byte to STDOUT
 ; Input.................: A         Byte value
 ; Output................: None
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
 ; Registers affected....: A, P
@@ -681,7 +681,7 @@ err_invalid:
 ; Input.................: X         File handle or standard stream
 ;                         r0-3      Requested file position
 ; Output................: r0-3      New file position
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
 ; Registers affected....: A, P, r0-3
@@ -747,7 +747,7 @@ err:
 ; Purpose...............: Returns current file position
 ; Input.................: X         File handle or standard stream
 ; Output................: r0-3      File position
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
 ; Registers affected....: A, P, r0-3
@@ -821,7 +821,7 @@ err:
 ;                         r8        Output buffer bank
 ;                         r9        Output buffer max length
 ; Output................: A         Output length
-; Preparatory rutines...: file_open
+; Preparatory routines..: file_open
 ; Errors................: C         Set on error
 ;                         A         Error code, ENOTOPEN, EINVAL, EIO
 ; Registers affected....: A, P
