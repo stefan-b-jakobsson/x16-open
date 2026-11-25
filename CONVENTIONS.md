@@ -31,5 +31,4 @@ All assembler directives should be written using snakecase.
 
 # Note
 
-Conventions are currently a work-in-progress, so these rules
-will be updated accordingly.
+Conventions are currently a work-in-progress, so these rules will be updated accordingly.
