@@ -27,6 +27,8 @@
 ; Includes
 .include "regs.inc"
 .include "io.inc"
+.include "device.inc"
+.include "file.inc"
 
 ; Exports
 .export terminal_dispatch
@@ -34,6 +36,7 @@
 ; Imports
 .import fetch
 .import device_call
+.import stdin_read, file_read_byte
 
 ; Definitions
 VERA_CHARSET_ADDR = charset_addr
@@ -63,7 +66,7 @@ jmp_table:
     .word on_register               ; ID 0, on_register
     .word not_implemented           ; ID 2, on_unregister
     .word open                      ; ID 4, open
-    .word not_implemented           ; ID 8, read_byte
+    .word read_byte                 ; ID 8, read_byte
     .word not_implemented           ; ID 10, read_block
     .word write_byte                ; ID 12, write_byte
     .word not_implemented           ; ID 14, write_block
@@ -84,6 +87,9 @@ jmp_table:
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
 .proc on_register
+    ; Set line return index
+    stz return_index
+
     ; Set screen dimensions
     lda #80
     sta screen_width
@@ -94,7 +100,7 @@ jmp_table:
     lda #$61
     sta color
     sta color_backup
-    lda #($61<<4) & $ff
+    lda #$10
     sta color_background
 
     ; Reset VERA + DCSEL=0 + ADDRSEL=0
@@ -143,13 +149,12 @@ jmp_table:
     ; Clear screen
     jsr clear_screen
 
-    ; Cursor show
-    lda #1
-    sta cursor_state
+    ; Cursor hidden
+    stz cursor_state
 
     ; Exit function
     clc
-    lda #%10000010
+    lda #(DEVICE_READING | DEVICE_WRITING | DEVICE_ENABLE_IRQ)
     rts
 .endproc
 
@@ -163,8 +168,64 @@ jmp_table:
 ; Credits...............: New implementation, not based on previous work
 .proc open
     ldy #0
-    lda #%10001010
+    lda #%10001011
     clc
+    rts
+.endproc
+
+;*****************************************************************************
+; Purpose...............: Reads a byte from the current line after RETURN
+;                         has been pressed
+; Input.................: None
+; Output................: A         
+; Preparatory routines..: None
+; Errors................: None
+; Preserved registers...: None
+; Credits...............: New implementation, not based on previous work
+.proc read_byte
+    lda return_index
+    bne next_char
+
+read_keyboard:
+    ; Enable cursor
+    lda #1
+    sta cursor_state
+
+loop:
+    ldx #STDKEYBOARD
+    jsr file_read_byte
+    cmp #13
+    beq return_line
+    sta r0
+    jsr write_byte
+    bra loop
+
+return_line:
+    ; Disable cursor
+    stz cursor_state
+    jsr cursor_hide
+
+next_char:
+    ; Pointer to next char
+    jsr vera_to_cursor
+    lda return_index
+    asl
+    sta VERA_ADDR_L
+
+    ; Check if done
+    inc return_index
+    lda return_index
+    cmp screen_width
+    bcc :+
+
+    stz return_index
+    lda #13
+    sta r0
+    jsr write_byte
+    lda #0
+    rts
+
+:   lda VERA_DATA0
     rts
 .endproc
 
@@ -177,8 +238,12 @@ jmp_table:
 ; Preserved registers...: None
 ; Credits...............: New implementation, not based on previous work
 .proc write_byte
+    lda r0
+    bne :+
+    rts
+
     ; Backup cursor state on stack
-    php ; Backup P
+:   php ; Backup P
     cli ; Disable interrupts
     lda cursor_state
     stz cursor_state
@@ -346,17 +411,14 @@ update_timer:
 show:
     ldx #60
     stx cursor_state
-    bra set_state
+    jsr cursor_show
+    bra exit
 
 hide:
     lda cursor_state
     cmp #30
     bne exit
-
-set_state:
-    jsr vera_to_cursor
-    inc VERA_ADDR_L
-    jsr toggle_cursor
+    jsr cursor_hide
     bra exit
 .endproc
 
@@ -501,6 +563,7 @@ height: .byt  60,  30,  60,  30,  15,  30,  15,  23,  50,  25,  50,  25
     asl
     asl
     sta color_background
+    jsr clear_screen
     jmp write_byte::restore_cursor
 .endproc
 
@@ -730,8 +793,30 @@ colors:  .byt $01, $02, $05, $06, $08, $00, $09, $0a, $0b, $0c, $0d, $0e, $0f, $
     adc #0
     sta VERA_ADDR_H
     lda VERA_CTRL
-    and #(~1)&255
+    and #((~1)&255)
     sta VERA_CTRL
+    rts
+.endproc
+
+.proc cursor_show
+    jsr vera_to_cursor
+    inc VERA_ADDR_L
+    lda VERA_DATA0
+    sta color_backup
+    lsr
+    lsr
+    lsr
+    lsr
+    ora color_background
+    sta VERA_DATA0
+    rts
+.endproc
+
+.proc cursor_hide
+    jsr vera_to_cursor
+    inc VERA_ADDR_L
+    lda color_backup
+    sta VERA_DATA0
     rts
 .endproc
 
@@ -754,10 +839,16 @@ show_cursor:
     lsr
     lsr
     ora color_background
+    dec VERA_ADDR_L
+    lda #$40
     sta VERA_DATA0
     rts
 
 hide_cursor:
+    dec VERA_ADDR_L
+    lda #32
+    sta VERA_DATA0
+    rts
     lda color_backup
     sta VERA_DATA0
     rts
@@ -951,3 +1042,5 @@ clear:
     color_backup: .res 1
 
     vera: .res 4
+
+    return_index: .res 1

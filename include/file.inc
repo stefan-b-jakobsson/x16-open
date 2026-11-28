@@ -1,10 +1,11 @@
 FILE_COUNT              = 16
 
-STD_COUNT               = 4
+STD_COUNT               = 5
 STDIN                   = $80
 STDOUT                  = $81
-STDMOUSE                = $82
-STDGAME                 = $83
+STDKEYBOARD             = $82
+STDMOUSE                = $83
+STDGAME                 = $84
 
 FILE_FOR_READING        = 1
 FILE_FOR_WRITING        = 2

@@ -74,28 +74,29 @@ std_streams:    .res STD_COUNT
     dex
     bne :-
 
-    ; Open STDIN as file #0
+    ; File #0: Terminal, as STDIN and STDOUT
     ldx #0
+    ldy #DEVICE_TERMINAL
+    lda #FILE_FOR_READING | FILE_FOR_WRITING
+    jsr file_open
+    bcs err
+    stx std_streams+STDIN-$80   ; Connect file handle to STDIN
+    stx std_streams+STDOUT-$80  ; Connect file handle to STDOUT
+
+    ; File #1: Keyboard as STDKEYBOARD
+    ldx #1
     ldy #DEVICE_KEYBOARD
     lda #FILE_FOR_READING
     jsr file_open
     bcs err
-    stx std_streams+STDIN-$80   ; Connect file handle to STDIN
+    stx std_streams+STDKEYBOARD-$80 ; Connect file handle to STDKEYBOARD
 
-    ; Open STDOUT as file #1
-    ldx #1
-    ldy #DEVICE_TERMINAL
-    lda #FILE_FOR_WRITING
-    jsr file_open
-    bcs err
-    stx std_streams+STDOUT-$80  ; Connect file handle to STDOUT
-
-    ; Open STD_MOUSE as file #2
+    ; File #2: Mouse as STDMOUSE
     ; TODO: Not yet implemented
     lda #$ff
     sta std_streams+STDMOUSE-$80
 
-    ; Open STD_GAME as file #3
+    ; File #3: SNES controller as STD_GAME
     ; TODO: Not yet implemented
     lda #$ff
     sta std_streams+STDGAME-$80
@@ -283,7 +284,7 @@ err:
 ; Credits...............: New implementation
 .proc file_read_byte
     ; Verify file handle is valid
-    cpx #FILE_COUNT
+:   cpx #FILE_COUNT
     bcc isopen
 
     cpx #$80
@@ -646,7 +647,7 @@ err_invalid:
     phx
 
     ; Read byte
-    ldx #STDIN
+    ldx std_streams+STDIN-$80
     jsr file_read_byte
 
     ; Restore X and exit
