@@ -213,7 +213,6 @@ next_char:
     sta VERA_ADDR_L
 
     ; Check if done
-    inc return_index
     lda return_index
     cmp screen_width
     bcc :+
@@ -225,7 +224,8 @@ next_char:
     lda #0
     rts
 
-:   lda VERA_DATA0
+:   inc return_index
+    lda VERA_DATA0
     rts
 .endproc
 

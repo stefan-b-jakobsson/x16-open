@@ -55,7 +55,8 @@
     ; Disable interrupts
     sei
 
-    ; Ensure ROM bank register is 0
+    ; Ensure RAM and ROM banks are 0
+    stz ram_bank
     stz rom_bank
 
     ; Setup RAM utils

@@ -36,6 +36,7 @@
 ; Imports
 .import i2c_read_byte
 .import memory_decompress_internal, fetch, fetvec
+.import keymap
 
 .segment "K_LRAM"
 BUFSIZE = 10
@@ -210,9 +211,10 @@ empty:
     jsr fetch
     sta r1
 
-    ; Decompress to $00:a000
-    stz r2
-    lda #$a0
+    ; Decompress to banked RAM
+    lda #<keymap
+    sta r2
+    lda #>keymap
     sta r3
     lda #<fetch_kbd
     sta r8
